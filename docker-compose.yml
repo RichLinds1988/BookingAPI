@@ -1,0 +1,77 @@
+services:
+  api:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_ENV: development
+      SECRET_KEY: dev-secret-change-me
+      JWT_SECRET_KEY: dev-jwt-secret-change-me
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: booking_user
+      MYSQL_PASSWORD: booking_password
+      MYSQL_DB: booking_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.3
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: booking_db
+      MYSQL_USER: booking_user
+      MYSQL_PASSWORD: booking_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "booking_user", "-pbooking_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  test:
+    build: .
+    command: pytest
+    environment:
+      FLASK_ENV: testing
+      SECRET_KEY: test-secret
+      JWT_SECRET_KEY: test-jwt-secret
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: booking_user
+      MYSQL_PASSWORD: booking_password
+      MYSQL_DB: booking_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - test
+
+volumes:
+  mysql_data:
+  redis_data:
