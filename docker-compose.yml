@@ -5,6 +5,7 @@ services:
       - "5000:5000"
     environment:
       FLASK_ENV: development
+      FLASK_APP: boot.py
       SECRET_KEY: dev-secret-change-me
       JWT_SECRET_KEY: dev-jwt-secret-change-me
       MYSQL_HOST: db
@@ -13,6 +14,10 @@ services:
       MYSQL_PASSWORD: booking_password
       MYSQL_DB: booking_db
       REDIS_URL: redis://redis:6379/0
+    volumes:
+      # Mount the local migrations folder into the container
+      # This ensures migration files are saved to your machine and committed to git
+      - ./migrations:/project/migrations
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +61,7 @@ services:
     command: pytest
     environment:
       FLASK_ENV: testing
+      FLASK_APP: boot.py
       SECRET_KEY: test-secret
       JWT_SECRET_KEY: test-jwt-secret
       MYSQL_HOST: db

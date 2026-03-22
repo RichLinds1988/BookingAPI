@@ -8,11 +8,13 @@ resources_bp = Blueprint("resources", __name__)
 
 
 @resources_bp.get("")
-@jwt_required()
+@jwt_required()  # Request must include a valid Authorization: Bearer <token> header
 @limiter.limit("60 per minute")
-@cache_response(ttl=60, key_prefix="resources")
+@cache_response(ttl=60, key_prefix="resources")  # Cache for 60 seconds
 def list_resources():
+    # Only return active resources — deactivated ones are hidden from regular users
     resources = Resource.query.filter_by(is_active=True).all()
+    # .all() executes the query and returns a list — without it you'd get a query object
     return jsonify([r.to_dict() for r in resources]), 200
 
 
@@ -21,6 +23,7 @@ def list_resources():
 @limiter.limit("60 per minute")
 @cache_response(ttl=60, key_prefix="resources")
 def get_resource(resource_id):
+    # get_or_404 returns the resource if found, or automatically returns a 404 response
     resource = Resource.query.get_or_404(resource_id)
     return jsonify(resource.to_dict()), 200
 
@@ -43,6 +46,7 @@ def create_resource():
     db.session.add(resource)
     db.session.commit()
 
+    # Invalidate the resource list cache so the new resource shows up immediately
     invalidate_cache("resources:*")
     return jsonify(resource.to_dict()), 201
 
@@ -54,6 +58,8 @@ def update_resource(resource_id):
     resource = Resource.query.get_or_404(resource_id)
     data = request.get_json(silent=True) or {}
 
+    # Only update fields that were actually sent in the request
+    # This way a PATCH with just {"name": "x"} won't accidentally clear other fields
     if "name" in data:
         resource.name = data["name"].strip()
     if "description" in data:

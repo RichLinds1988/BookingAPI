@@ -7,10 +7,16 @@ from app.middleware.cache import cache_response, invalidate_cache
 
 bookings_bp = Blueprint("bookings", __name__)
 
+# Expected datetime format for all booking times
 DATETIME_FMT = "%Y-%m-%dT%H:%M:%S"
 
 
 def _parse_dt(value: str) -> datetime | None:
+    """
+    Safely parse a datetime string. Returns None if the format is wrong
+    instead of raising an exception that would crash the request.
+    The leading underscore means this is a private helper — not a route.
+    """
     try:
         return datetime.strptime(value, DATETIME_FMT)
     except (ValueError, TypeError):
@@ -18,19 +24,28 @@ def _parse_dt(value: str) -> datetime | None:
 
 
 def _has_conflict(resource_id: int, start: datetime, end: datetime, exclude_id: int = None) -> bool:
-    """Return True if any confirmed booking overlaps the requested window.
+    """
+    Check if a time slot is already taken for a given resource.
 
-    Uses half-open interval logic: [start, end) so back-to-back bookings
-    on the same resource are allowed.
+    Uses half-open interval logic [start, end) so back-to-back bookings are allowed.
+    e.g. a booking ending at 10:00 and one starting at 10:00 do NOT conflict.
+
+    The overlap condition is: existing.start < new.end AND existing.end > new.start
+    This catches all overlap cases: partial overlap, full containment, and exact match.
     """
     query = Booking.query.filter(
         Booking.resource_id == resource_id,
-        Booking.status == "confirmed",
+        Booking.status == "confirmed",  # Cancelled bookings free up the slot
         Booking.start_time < end,
         Booking.end_time > start,
     )
+
+    # When updating a booking we exclude itself from the conflict check
     if exclude_id:
         query = query.filter(Booking.id != exclude_id)
+
+    # .first() returns the first match or None — more efficient than .all()
+    # since we only care whether any conflict exists, not how many
     return query.first() is not None
 
 
@@ -39,6 +54,8 @@ def _has_conflict(resource_id: int, start: datetime, end: datetime, exclude_id: 
 @limiter.limit("60 per minute")
 @cache_response(ttl=30, key_prefix="bookings")
 def list_bookings():
+    # get_jwt_identity() extracts the user ID we stored in the token during login
+    # We stored it as a string so we convert back to int for the DB query
     user_id = int(get_jwt_identity())
     bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.start_time).all()
     return jsonify([b.to_dict() for b in bookings]), 200
@@ -49,6 +66,7 @@ def list_bookings():
 @limiter.limit("60 per minute")
 def get_booking(booking_id):
     user_id = int(get_jwt_identity())
+    # Filter by both booking ID and user ID — prevents users from accessing other users' bookings
     booking = Booking.query.filter_by(id=booking_id, user_id=user_id).first_or_404()
     return jsonify(booking.to_dict()), 200
 
@@ -63,10 +81,16 @@ def create_booking():
     resource_id = data.get("resource_id")
     start = _parse_dt(data.get("start_time"))
     end = _parse_dt(data.get("end_time"))
+    guests = int(data.get("guests", 1))
 
+    # Validate all required fields — _parse_dt returns None for invalid/missing datetimes
     if not all([resource_id, start, end]):
         return jsonify({"error": "resource_id, start_time and end_time are required"}), 422
 
+    if guests < 1:
+        return jsonify({"error": "guests must be at least 1"}), 422
+
+    # Prevent bookings in the past
     if start < datetime.now():
         return jsonify({"error": "start_time cannot be in the past"}), 422
 
@@ -74,9 +98,18 @@ def create_booking():
         return jsonify({"error": "end_time must be after start_time"}), 422
 
     resource = Resource.query.get_or_404(resource_id)
+
+    # Don't allow bookings on deactivated resources
     if not resource.is_active:
         return jsonify({"error": "Resource is not available"}), 409
 
+    # Validate that the number of guests doesn't exceed the resource's capacity
+    if guests > resource.capacity:
+        return jsonify({
+            "error": f"Number of guests ({guests}) exceeds resource capacity ({resource.capacity})"
+        }), 422
+
+    # Check for overlapping bookings before inserting
     if _has_conflict(resource_id, start, end):
         return jsonify({"error": "Resource already booked for that time slot"}), 409
 
@@ -86,10 +119,12 @@ def create_booking():
         start_time=start,
         end_time=end,
         notes=data.get("notes"),
+        guests=guests,
     )
     db.session.add(booking)
     db.session.commit()
 
+    # Clear cached booking lists and availability so they reflect the new booking
     invalidate_cache("bookings:*")
     invalidate_cache("availability:*")
     return jsonify(booking.to_dict()), 201
@@ -105,9 +140,12 @@ def cancel_booking(booking_id):
     if booking.status == "cancelled":
         return jsonify({"error": "Booking is already cancelled"}), 409
 
+    # Soft delete — mark as cancelled rather than removing the row
+    # This preserves history and allows the slot to be rebooked
     booking.status = "cancelled"
     db.session.commit()
 
+    # Clear availability cache so the freed slot shows as available immediately
     invalidate_cache("bookings:*")
     invalidate_cache("availability:*")
     return jsonify(booking.to_dict()), 200
@@ -118,6 +156,7 @@ def cancel_booking(booking_id):
 @limiter.limit("60 per minute")
 @cache_response(ttl=30, key_prefix="availability")
 def check_availability(resource_id):
+    # Verify the resource exists before checking availability
     Resource.query.get_or_404(resource_id)
 
     start = _parse_dt(request.args.get("start_time"))

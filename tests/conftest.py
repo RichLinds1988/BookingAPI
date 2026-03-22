@@ -20,12 +20,9 @@ class TestConfig:
 
 @pytest.fixture(scope="session")
 def app():
-    """Create app with in-memory SQLite and mocked Redis."""
     with patch("app.redis_lib.from_url") as mock_redis:
         mock_redis.return_value = MagicMock()
         application = create_app(TestConfig)
-
-    # Patch redis_client globally so cache decorator is a no-op
     with patch("app.middleware.cache.redis_client") as mock_cache_redis:
         mock_cache_redis.get.return_value = None
         mock_cache_redis.setex.return_value = True
@@ -35,7 +32,6 @@ def app():
 
 @pytest.fixture(scope="function")
 def db(app):
-    """Fresh database for each test."""
     with app.app_context():
         _db.create_all()
         yield _db
