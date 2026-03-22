@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required
 from app import db, limiter
 from app.models import Resource
 from app.middleware.cache import cache_response, invalidate_cache
+from app.utils.pagination import paginate
 
 resources_bp = Blueprint("resources", __name__)
 
@@ -13,9 +14,9 @@ resources_bp = Blueprint("resources", __name__)
 @cache_response(ttl=60, key_prefix="resources")  # Cache for 60 seconds
 def list_resources():
     # Only return active resources — deactivated ones are hidden from regular users
-    resources = Resource.query.filter_by(is_active=True).all()
-    # .all() executes the query and returns a list — without it you'd get a query object
-    return jsonify([r.to_dict() for r in resources]), 200
+    query = Resource.query.filter_by(is_active=True).order_by(Resource.name)
+    # paginate() reads ?page=1&per_page=20 from the request and returns a standard envelope
+    return jsonify(paginate(query)), 200
 
 
 @resources_bp.get("/<int:resource_id>")

@@ -4,6 +4,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db, limiter
 from app.models import Booking, Resource
 from app.middleware.cache import cache_response, invalidate_cache
+from app.utils.pagination import paginate
 
 bookings_bp = Blueprint("bookings", __name__)
 
@@ -57,8 +58,9 @@ def list_bookings():
     # get_jwt_identity() extracts the user ID we stored in the token during login
     # We stored it as a string so we convert back to int for the DB query
     user_id = int(get_jwt_identity())
-    bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.start_time).all()
-    return jsonify([b.to_dict() for b in bookings]), 200
+    query = Booking.query.filter_by(user_id=user_id).order_by(Booking.start_time)
+    # paginate() reads ?page=1&per_page=20 from the request and returns a standard envelope
+    return jsonify(paginate(query)), 200
 
 
 @bookings_bp.get("/<int:booking_id>")
