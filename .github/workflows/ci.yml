@@ -25,7 +25,7 @@ jobs:
         run: flake8 app/ --max-line-length=120 --ignore=E501,W503
 
       - name: mypy (type checking)
-        run: mypy app/ --ignore-missing-imports --no-strict-optional
+        run: mypy app/
 
   test:
     name: Tests
