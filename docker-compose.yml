@@ -58,7 +58,7 @@ services:
 
   test:
     build: .
-    command: pytest
+    command: bash -c "pip install -r requirements-dev.txt && pytest"
     environment:
       FLASK_ENV: testing
       FLASK_APP: boot.py
