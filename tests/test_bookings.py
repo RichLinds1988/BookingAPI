@@ -87,12 +87,16 @@ class TestListBookings:
         make_booking(client, auth_headers, test_resource.id, start, end)
         res = client.get("/api/bookings", headers=auth_headers)
         assert res.status_code == 200
-        assert len(res.get_json()) == 1
+        data = res.get_json()
+        assert len(data["items"]) == 1
+        assert data["pagination"]["total"] == 1
 
     def test_list_empty(self, client, auth_headers):
         res = client.get("/api/bookings", headers=auth_headers)
         assert res.status_code == 200
-        assert res.get_json() == []
+        data = res.get_json()
+        assert data["items"] == []
+        assert data["pagination"]["total"] == 0
 
     def test_list_requires_auth(self, client):
         res = client.get("/api/bookings")

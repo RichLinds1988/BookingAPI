@@ -9,14 +9,17 @@ class TestListResources:
     def test_list_empty(self, client, auth_headers):
         res = client.get("/api/resources", headers=auth_headers)
         assert res.status_code == 200
-        assert res.get_json() == []
+        data = res.get_json()
+        assert data["items"] == []
+        assert data["pagination"]["total"] == 0
 
     def test_list_returns_active_resources(self, client, auth_headers, test_resource):
         res = client.get("/api/resources", headers=auth_headers)
         assert res.status_code == 200
         data = res.get_json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Boardroom A"
+        assert len(data["items"]) == 1
+        assert data["items"][0]["name"] == "Boardroom A"
+        assert data["pagination"]["total"] == 1
 
     def test_list_excludes_inactive(self, client, auth_headers, db, app):
         with app.app_context():
@@ -27,7 +30,8 @@ class TestListResources:
 
         res = client.get("/api/resources", headers=auth_headers)
         assert res.status_code == 200
-        assert all(r["is_active"] for r in res.get_json())
+        data = res.get_json()
+        assert all(r["is_active"] for r in data["items"])
 
 
 class TestGetResource:
