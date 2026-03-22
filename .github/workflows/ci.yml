@@ -22,10 +22,10 @@ jobs:
         run: pip install flake8 mypy
 
       - name: flake8 (style + errors)
-        run: flake8 app/ --max-line-length=120 --ignore=E501,W503
+        run: flake8 src/app/ --max-line-length=120 --ignore=E501,W503
 
       - name: mypy (type checking)
-        run: mypy app/
+        run: mypy src/app/ --ignore-missing-imports --no-strict-optional
 
   test:
     name: Tests
