@@ -40,4 +40,4 @@ def invalidate_cache(pattern: str):
     keys = redis_client.keys(pattern)
     if keys:
         redis_client.delete(*keys)
-        
+
