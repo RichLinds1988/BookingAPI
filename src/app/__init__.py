@@ -62,12 +62,17 @@ def create_app(config_class=Config):
     from app.routes.auth import auth_bp
     from app.routes.bookings import bookings_bp
     from app.routes.resources import resources_bp
+    from app.routes.health import health_bp
 
     # Register each blueprint with a URL prefix
     # All routes in auth_bp will be prefixed with /api/auth, etc.
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(bookings_bp, url_prefix="/api/bookings")
     app.register_blueprint(resources_bp, url_prefix="/api/resources")
+
+    # Health check is at the root — no /api prefix so load balancers can reach it
+    # without needing auth headers or knowing the API structure
+    app.register_blueprint(health_bp)
 
     _register_error_handlers(app)
 
