@@ -67,6 +67,25 @@ def auth_headers(app, test_user):
 
 
 @pytest.fixture
+def admin_user(db, app):
+    """A user with admin role for testing admin-only endpoints."""
+    with app.app_context():
+        user = User(name="Admin User", email="admin@example.com", role="admin")
+        user.set_password("password123")
+        db.session.add(user)
+        db.session.commit()
+        db.session.refresh(user)
+        return user
+
+
+@pytest.fixture
+def admin_headers(app, admin_user):
+    with app.app_context():
+        token = create_access_token(identity=str(admin_user.id))
+        return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+
+@pytest.fixture
 def test_resource(db, app):
     with app.app_context():
         resource = Resource(name="Boardroom A", description="Main boardroom", capacity=10)

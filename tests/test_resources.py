@@ -46,8 +46,8 @@ class TestGetResource:
 
 
 class TestCreateResource:
-    def test_create_success(self, client, auth_headers):
-        res = client.post("/api/resources", headers=auth_headers, json={
+    def test_create_success(self, client, admin_headers):
+        res = client.post("/api/resources", headers=admin_headers, json={
             "name": "Meeting Room B",
             "description": "Small meeting room",
             "capacity": 4
@@ -58,8 +58,8 @@ class TestCreateResource:
         assert data["capacity"] == 4
         assert data["is_active"] is True
 
-    def test_create_missing_name(self, client, auth_headers):
-        res = client.post("/api/resources", headers=auth_headers, json={
+    def test_create_missing_name(self, client, admin_headers):
+        res = client.post("/api/resources", headers=admin_headers, json={
             "description": "No name provided"
         })
         assert res.status_code == 422
@@ -70,24 +70,24 @@ class TestCreateResource:
 
 
 class TestUpdateResource:
-    def test_update_name(self, client, auth_headers, test_resource):
+    def test_update_name(self, client, admin_headers, test_resource):
         res = client.patch(
             f"/api/resources/{test_resource.id}",
-            headers=auth_headers,
+            headers=admin_headers,
             json={"name": "Boardroom B"}
         )
         assert res.status_code == 200
         assert res.get_json()["name"] == "Boardroom B"
 
-    def test_deactivate_resource(self, client, auth_headers, test_resource):
+    def test_deactivate_resource(self, client, admin_headers, test_resource):
         res = client.patch(
             f"/api/resources/{test_resource.id}",
-            headers=auth_headers,
+            headers=admin_headers,
             json={"is_active": False}
         )
         assert res.status_code == 200
         assert res.get_json()["is_active"] is False
 
-    def test_update_not_found(self, client, auth_headers):
-        res = client.patch("/api/resources/999", headers=auth_headers, json={"name": "X"})
+    def test_update_not_found(self, client, admin_headers):
+        res = client.patch("/api/resources/999", headers=admin_headers, json={"name": "X"})
         assert res.status_code == 404
