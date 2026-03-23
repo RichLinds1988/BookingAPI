@@ -9,6 +9,8 @@ from flasgger import Swagger
 import redis as redis_lib
 
 from config import Config
+from app.utils.logging import configure_logging
+from app.middleware.request_logger import register_request_logging
 
 # These are created at module level so other files can import them directly
 # e.g. "from app import db" in models.py
@@ -75,6 +77,12 @@ def create_app(config_class=Config):
 
     # Allow cross-origin requests from the frontend
     CORS(app)
+
+    # Configure structured JSON logging — replaces Flask default plain text logs
+    configure_logging(app)
+
+    # Register before/after request hooks that log every HTTP request
+    register_request_logging(app)
 
     # Connect each extension to this specific app instance
     db.init_app(app)
