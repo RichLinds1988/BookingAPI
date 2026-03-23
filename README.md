@@ -1,4 +1,4 @@
-# booking-api
+# Booking API
 
 A RESTful booking API built with Flask, PostgreSQL, and Redis. Supports JWT authentication, Redis caching, rate limiting, database migrations, and a health check endpoint. Runs fully containerized via Docker Compose.
 
