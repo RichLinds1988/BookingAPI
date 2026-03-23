@@ -73,3 +73,29 @@ class TestLogin:
     def test_login_missing_fields(self, client):
         res = client.post("/api/auth/login", json={"email": "test@example.com"})
         assert res.status_code == 401
+
+
+class TestRefresh:
+    def test_refresh_returns_new_access_token(self, client, test_user):
+        from flask_jwt_extended import create_refresh_token
+        with client.application.app_context():
+            refresh_token = create_refresh_token(identity=str(test_user.id))
+        res = client.post("/api/auth/refresh", headers={
+            "Authorization": f"Bearer {refresh_token}",
+            "Content-Type": "application/json",
+        })
+        assert res.status_code == 200
+        assert "access_token" in res.get_json()
+
+    def test_refresh_fails_with_access_token(self, client, auth_headers):
+        # Access tokens should not work on the refresh endpoint
+        res = client.post("/api/auth/refresh", headers=auth_headers)
+        assert res.status_code == 422
+
+    def test_login_returns_refresh_token(self, client, test_user):
+        res = client.post("/api/auth/login", json={
+            "email": "test@example.com",
+            "password": "password123"
+        })
+        assert res.status_code == 200
+        assert "refresh_token" in res.get_json()

@@ -38,3 +38,8 @@ class Config:
     # How long a JWT token is valid before the user needs to log in again
     # os.getenv always returns a string so we convert to int before passing to timedelta
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600)))
+
+    # Refresh tokens live much longer than access tokens — 7 days by default
+    # When the access token expires, the client uses the refresh token to get a new one
+    # without requiring the user to log in again
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES_DAYS", 7)))

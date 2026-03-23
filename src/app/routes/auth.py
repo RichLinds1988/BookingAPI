@@ -1,10 +1,13 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    jwt_required,
+    get_jwt_identity,
+)
 from app import db, limiter
 from app.models import User
 
-# A Blueprint groups related routes together — similar to a controller in Symfony
-# The first argument is the blueprint's name, used internally by Flask
 auth_bp = Blueprint("auth", __name__)
 
 
@@ -35,7 +38,7 @@ def register():
                 example: supersecret
     responses:
       201:
-        description: User registered successfully
+        description: User registered successfully — returns access and refresh tokens
       409:
         description: Email already registered
       422:
@@ -61,8 +64,14 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    token = create_access_token(identity=str(user.id))
-    return jsonify({"user": user.to_dict(), "access_token": token}), 201
+    # Issue both tokens on registration so the user is immediately logged in
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
+    return jsonify({
+        "user": user.to_dict(),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    }), 201
 
 
 @auth_bp.post("/login")
@@ -89,7 +98,7 @@ def login():
                 example: supersecret
     responses:
       200:
-        description: Login successful, returns JWT token
+        description: Login successful — returns access and refresh tokens
       401:
         description: Invalid credentials
     """
@@ -100,8 +109,41 @@ def login():
 
     user = User.query.filter_by(email=email).first()
 
+    # Deliberately use the same error for wrong email and wrong password
+    # to prevent user enumeration attacks
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid email or password"}), 401
 
-    token = create_access_token(identity=str(user.id))
-    return jsonify({"user": user.to_dict(), "access_token": token}), 200
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
+    return jsonify({
+        "user": user.to_dict(),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    }), 200
+
+
+@auth_bp.post("/refresh")
+@jwt_required(refresh=True)  # This endpoint requires a refresh token, not an access token
+@limiter.limit("60 per hour")
+def refresh():
+    """
+    Get a new access token using a refresh token.
+    ---
+    tags:
+      - Auth
+    security:
+      - Bearer: []
+    description: |
+      Pass your refresh token in the Authorization header.
+      Returns a new short-lived access token without requiring re-login.
+    responses:
+      200:
+        description: New access token issued
+      401:
+        description: Invalid or expired refresh token
+    """
+    # get_jwt_identity() works the same way for refresh tokens
+    user_id = get_jwt_identity()
+    new_access_token = create_access_token(identity=user_id)
+    return jsonify({"access_token": new_access_token}), 200
