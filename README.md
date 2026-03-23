@@ -4,6 +4,12 @@ A production-ready RESTful booking API built with Flask, PostgreSQL, and Redis. 
 
 Pairs with the [BookingUI](https://github.com/RichLinds1988/BookingUI) frontend built in React + TypeScript.
 
+![CI](https://github.com/RichLinds1988/BookingAPI/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![Flask](https://img.shields.io/badge/flask-3.0-green)
+![PostgreSQL](https://img.shields.io/badge/postgres-16-blue)
+
 ## Stack
 
 - **Flask** — API framework
