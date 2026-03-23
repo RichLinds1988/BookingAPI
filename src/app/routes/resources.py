@@ -4,6 +4,7 @@ from app import db, limiter
 from app.models import Resource
 from app.middleware.cache import cache_response, invalidate_cache
 from app.utils.pagination import paginate
+from app.utils.decorators import admin_required
 
 resources_bp = Blueprint("resources", __name__)
 
@@ -71,6 +72,7 @@ def get_resource(resource_id):
 
 @resources_bp.post("")
 @jwt_required()
+@admin_required  # Only admins can create resources
 @limiter.limit("30 per hour")
 def create_resource():
     """
@@ -123,6 +125,7 @@ def create_resource():
 
 @resources_bp.patch("/<int:resource_id>")
 @jwt_required()
+@admin_required  # Only admins can update resources
 @limiter.limit("30 per hour")
 def update_resource(resource_id):
     """

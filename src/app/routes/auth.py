@@ -147,3 +147,69 @@ def refresh():
     user_id = get_jwt_identity()
     new_access_token = create_access_token(identity=user_id)
     return jsonify({"access_token": new_access_token}), 200
+
+
+@auth_bp.patch("/users/<int:user_id>/role")
+@jwt_required()
+@limiter.limit("10 per hour")
+def update_user_role(user_id):
+    """
+    Update a user's role (promote to admin or demote to user).
+    ---
+    tags:
+      - Auth
+    security:
+      - Bearer: []
+    description: Only existing admins can change user roles. The first admin must be set directly in the database.
+    parameters:
+      - in: path
+        name: user_id
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [role]
+            properties:
+              role:
+                type: string
+                enum: [user, admin]
+                example: admin
+    responses:
+      200:
+        description: User role updated
+      400:
+        description: Invalid role
+      403:
+        description: Only admins can change user roles
+      404:
+        description: User not found
+    """
+    from app.models import User
+
+    # Check the requesting user is an admin
+    requesting_user_id = int(get_jwt_identity())
+    requesting_user = User.query.get(requesting_user_id)
+    if not requesting_user or requesting_user.role != "admin":
+        return jsonify({"error": "Admin access required"}), 403
+
+    data = request.get_json(silent=True) or {}
+    new_role = data.get("role")
+
+    if new_role not in ("user", "admin"):
+        return jsonify({"error": "role must be either 'user' or 'admin'"}), 400
+
+    # Prevent admins from accidentally removing their own admin access
+    if user_id == requesting_user_id and new_role == "user":
+        return jsonify({"error": "You cannot remove your own admin access"}), 400
+
+    target_user = User.query.get_or_404(user_id)
+    target_user.role = new_role
+    db.session.commit()
+
+    action = "promoted to admin" if new_role == "admin" else "demoted to user"
+    return jsonify({"message": f"{target_user.name} {action}", "user": target_user.to_dict()}), 200

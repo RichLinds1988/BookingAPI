@@ -15,6 +15,12 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(255), nullable=False)
 
+    # Role controls what the user can do — 'user' can book, 'admin' can manage resources
+    # Default is 'user' so all new registrations are non-privileged
+    role = db.Column(
+        db.Enum('user', 'admin', name='user_role'), default='user', nullable=False
+    )
+
     # lambda is used here so the datetime is evaluated at insert time, not at class definition time
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -39,7 +45,7 @@ class User(db.Model):
 
     def to_dict(self):
         # Only expose safe fields — never include password_hash in API responses
-        return {"id": self.id, "email": self.email, "name": self.name}
+        return {"id": self.id, "email": self.email, "name": self.name, "role": self.role}
 
 
 class Resource(db.Model):
