@@ -55,6 +55,27 @@ cp .env.example .env
 
 ---
 
+## Running CI Checks Locally
+
+**Flake8:**
+```bash
+docker compose run --rm api bash -c "pip install -r requirements-dev.txt && flake8 src/app/ --max-line-length=120 --ignore=E501,W503"
+```
+
+**Mypy:**
+```bash
+docker compose run --rm api bash -c "pip install -r requirements-dev.txt && mypy src/app/"
+```
+
+**Tests:**
+```bash
+docker compose --profile test run test
+```
+
+## API Documentation
+
+Interactive Swagger UI is available at `http://localhost:5000/apidocs` when the app is running. Click **Authorize** and enter `Bearer <your_token>` to test protected endpoints directly from the browser.
+
 ## API Reference
 
 All protected routes require the `Authorization: Bearer <token>` header.

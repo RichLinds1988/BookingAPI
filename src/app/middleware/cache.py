@@ -64,4 +64,4 @@ def invalidate_cache(pattern: str):
     if keys:
         # The * unpacks the list so delete receives individual keys as arguments
         # rather than a single list argument
-        redis_client.delete(*keys)
+        redis_client.delete(*list(keys))

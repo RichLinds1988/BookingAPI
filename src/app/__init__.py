@@ -1,10 +1,11 @@
 from flask import Flask
-from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
+from flask_cors import CORS
+from flasgger import Swagger
 import redis as redis_lib
 
 from config import Config
@@ -23,6 +24,43 @@ limiter = Limiter(key_func=get_remote_address)
 # The type hint tells editors and type checkers what type this will eventually be
 redis_client: redis_lib.Redis = None
 
+# Swagger UI configuration
+# Accessible at /apidocs when the app is running
+SWAGGER_CONFIG = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": "apispec",
+            "route": "/apispec.json",
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs",
+    "info": {
+        "title": "Booking API",
+        "description": "A RESTful booking API with JWT auth, Redis caching, and rate limiting.",
+        "version": "1.0.0",
+        "contact": {
+            "name": "RichLinds1988",
+            "url": "https://github.com/RichLinds1988/BookingAPI",
+        },
+    },
+    "securityDefinitions": {
+        # Tell Swagger UI how to pass the JWT token
+        # Users can click 'Authorize' and enter their token once for all requests
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "Enter: Bearer <your_token>",
+        }
+    },
+    "security": [{"Bearer": []}],
+}
+
 
 def create_app(config_class=Config):
     """
@@ -31,22 +69,21 @@ def create_app(config_class=Config):
     without changing any other code.
     """
     app = Flask(__name__)
-    CORS(app)
 
     # Load all config values from the Config class into app.config
     app.config.from_object(config_class)
 
+    # Allow cross-origin requests from the frontend
+    CORS(app)
+
     # Connect each extension to this specific app instance
-    # Extensions are created above without an app so they can be reused across
-    # multiple app instances (important for testing)
     db.init_app(app)
     jwt.init_app(app)
     limiter.init_app(app)
-
-    # Flask-Migrate manages database schema changes via versioned migration files
-    # Instead of db.create_all() which can't handle changes to existing tables,
-    # Migrate tracks what's changed and generates ALTER TABLE statements
     migrate.init_app(app, db)
+
+    # Initialize Swagger UI — serves interactive API docs at /apidocs
+    Swagger(app, config=SWAGGER_CONFIG, merge=True)
 
     # Create the Redis client from the connection URL
     # decode_responses=True means Redis returns strings instead of raw bytes
@@ -54,7 +91,6 @@ def create_app(config_class=Config):
     redis_client = redis_lib.from_url(app.config["REDIS_URL"], decode_responses=True)
 
     # Store rate limit data in Redis so limits persist across app restarts
-    # and work correctly when running multiple instances
     app.config["RATELIMIT_STORAGE_URI"] = app.config["REDIS_URL"]
 
     # Import blueprints here (inside the function) rather than at the top of the file
@@ -64,14 +100,11 @@ def create_app(config_class=Config):
     from app.routes.resources import resources_bp
     from app.routes.health import health_bp
 
-    # Register each blueprint with a URL prefix
-    # All routes in auth_bp will be prefixed with /api/auth, etc.
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(bookings_bp, url_prefix="/api/bookings")
     app.register_blueprint(resources_bp, url_prefix="/api/resources")
 
     # Health check is at the root — no /api prefix so load balancers can reach it
-    # without needing auth headers or knowing the API structure
     app.register_blueprint(health_bp)
 
     _register_error_handlers(app)
@@ -83,7 +116,6 @@ def _register_error_handlers(app):
     """
     Override Flask's default HTML error pages with JSON responses.
     This is important for an API — clients expect JSON, not HTML.
-    The leading underscore signals this function is internal to this module.
     """
 
     @app.errorhandler(404)
@@ -94,7 +126,6 @@ def _register_error_handlers(app):
     @app.errorhandler(429)
     def rate_limited(e):
         from flask import jsonify
-        # e.description contains the retry-after information from Flask-Limiter
         return jsonify({"error": "Too many requests", "retry_after": str(e.description)}), 429
 
     @app.errorhandler(500)

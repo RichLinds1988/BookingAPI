@@ -9,13 +9,35 @@ resources_bp = Blueprint("resources", __name__)
 
 
 @resources_bp.get("")
-@jwt_required()  # Request must include a valid Authorization: Bearer <token> header
+@jwt_required()
 @limiter.limit("60 per minute")
-@cache_response(ttl=60, key_prefix="resources")  # Cache for 60 seconds
+@cache_response(ttl=60, key_prefix="resources")
 def list_resources():
-    # Only return active resources — deactivated ones are hidden from regular users
+    """
+    List all active resources.
+    ---
+    tags:
+      - Resources
+    security:
+      - Bearer: []
+    parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+      - in: query
+        name: per_page
+        schema:
+          type: integer
+          default: 20
+    responses:
+      200:
+        description: Paginated list of resources
+      401:
+        description: Missing or invalid token
+    """
     query = Resource.query.filter_by(is_active=True).order_by(Resource.name)
-    # paginate() reads ?page=1&per_page=20 from the request and returns a standard envelope
     return jsonify(paginate(query)), 200
 
 
@@ -24,7 +46,25 @@ def list_resources():
 @limiter.limit("60 per minute")
 @cache_response(ttl=60, key_prefix="resources")
 def get_resource(resource_id):
-    # get_or_404 returns the resource if found, or automatically returns a 404 response
+    """
+    Get a single resource by ID.
+    ---
+    tags:
+      - Resources
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: resource_id
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Resource found
+      404:
+        description: Resource not found
+    """
     resource = Resource.query.get_or_404(resource_id)
     return jsonify(resource.to_dict()), 200
 
@@ -33,6 +73,36 @@ def get_resource(resource_id):
 @jwt_required()
 @limiter.limit("30 per hour")
 def create_resource():
+    """
+    Create a new bookable resource.
+    ---
+    tags:
+      - Resources
+    security:
+      - Bearer: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+                example: Boardroom A
+              description:
+                type: string
+                example: 10-person boardroom with projector
+              capacity:
+                type: integer
+                example: 10
+    responses:
+      201:
+        description: Resource created
+      422:
+        description: Validation error
+    """
     data = request.get_json(silent=True) or {}
 
     name = (data.get("name") or "").strip()
@@ -47,7 +117,6 @@ def create_resource():
     db.session.add(resource)
     db.session.commit()
 
-    # Invalidate the resource list cache so the new resource shows up immediately
     invalidate_cache("resources:*")
     return jsonify(resource.to_dict()), 201
 
@@ -56,11 +125,42 @@ def create_resource():
 @jwt_required()
 @limiter.limit("30 per hour")
 def update_resource(resource_id):
+    """
+    Update a resource.
+    ---
+    tags:
+      - Resources
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: resource_id
+        required: true
+        schema:
+          type: integer
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              capacity:
+                type: integer
+              is_active:
+                type: boolean
+    responses:
+      200:
+        description: Resource updated
+      404:
+        description: Resource not found
+    """
     resource = Resource.query.get_or_404(resource_id)
     data = request.get_json(silent=True) or {}
 
-    # Only update fields that were actually sent in the request
-    # This way a PATCH with just {"name": "x"} won't accidentally clear other fields
     if "name" in data:
         resource.name = data["name"].strip()
     if "description" in data:
