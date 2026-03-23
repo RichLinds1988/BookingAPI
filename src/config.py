@@ -13,13 +13,13 @@ class Config:
 
     # SQLAlchemy connection string — built from individual env vars
     # Format: driver://user:password@host:port/database
-    # mysql+pymysql tells SQLAlchemy to use MySQL with the PyMySQL driver
+    # postgresql+psycopg2 tells SQLAlchemy to use Postgres with the psycopg2 driver
     SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{os.getenv('MYSQL_USER', 'root')}:"
-        f"{os.getenv('MYSQL_PASSWORD', '')}@"
-        f"{os.getenv('MYSQL_HOST', 'localhost')}:"
-        f"{os.getenv('MYSQL_PORT', '3306')}/"
-        f"{os.getenv('MYSQL_DB', 'booking_db')}"
+        f"postgresql+psycopg2://{os.getenv('DB_USER', 'booking_user')}:"
+        f"{os.getenv('DB_PASSWORD', '')}@"
+        f"{os.getenv('DB_HOST', 'localhost')}:"
+        f"{os.getenv('DB_PORT', '5432')}/"
+        f"{os.getenv('DB_NAME', 'booking_db')}"
     )
 
     # Disables a deprecated SQLAlchemy feature that watches for object changes

@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install linting tools
-        run: pip install flake8 mypy
+        run: pip install -r requirements-dev.txt
 
       - name: flake8 (style + errors)
         run: flake8 src/app/ --max-line-length=120 --ignore=E501,W503
@@ -33,17 +33,16 @@ jobs:
     needs: lint
 
     services:
-      mysql:
-        image: mysql:8.3
+      postgres:
+        image: postgres:16-alpine
         env:
-          MYSQL_ROOT_PASSWORD: root_password
-          MYSQL_DATABASE: booking_db
-          MYSQL_USER: booking_user
-          MYSQL_PASSWORD: booking_password
+          POSTGRES_DB: booking_db
+          POSTGRES_USER: booking_user
+          POSTGRES_PASSWORD: booking_password
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -u booking_user -pbooking_password"
+          --health-cmd="pg_isready -U booking_user -d booking_db"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
@@ -72,13 +71,13 @@ jobs:
       - name: Run tests
         run: pytest
         env:
-          PYTHONPATH: .
+          PYTHONPATH: src
           FLASK_ENV: testing
           SECRET_KEY: ci-secret-key
           JWT_SECRET_KEY: ci-jwt-secret-key-long-enough
-          MYSQL_HOST: 127.0.0.1
-          MYSQL_PORT: 3306
-          MYSQL_USER: booking_user
-          MYSQL_PASSWORD: booking_password
-          MYSQL_DB: booking_db
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_USER: booking_user
+          DB_PASSWORD: booking_password
+          DB_NAME: booking_db
           REDIS_URL: redis://localhost:6379/0

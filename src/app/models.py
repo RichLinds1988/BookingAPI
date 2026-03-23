@@ -84,7 +84,7 @@ class Booking(db.Model):
 
     # Enum restricts the column to only these three values at the database level
     status = db.Column(
-        db.Enum("confirmed", "cancelled", "pending"), default="confirmed"
+        db.Enum("confirmed", "cancelled", "pending", name="booking_status"), default="confirmed"
     )
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 

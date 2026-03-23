@@ -8,11 +8,11 @@ services:
       FLASK_APP: boot.py
       SECRET_KEY: dev-secret-change-me
       JWT_SECRET_KEY: dev-jwt-secret-change-me
-      MYSQL_HOST: db
-      MYSQL_PORT: 3306
-      MYSQL_USER: booking_user
-      MYSQL_PASSWORD: booking_password
-      MYSQL_DB: booking_db
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: booking_user
+      DB_PASSWORD: booking_password
+      DB_NAME: booking_db
       REDIS_URL: redis://redis:6379/0
     volumes:
       # Mount the local migrations folder into the container
@@ -26,18 +26,17 @@ services:
     restart: unless-stopped
 
   db:
-    image: mysql:8.3
+    image: postgres:16-alpine
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: booking_db
-      MYSQL_USER: booking_user
-      MYSQL_PASSWORD: booking_password
+      POSTGRES_DB: booking_db
+      POSTGRES_USER: booking_user
+      POSTGRES_PASSWORD: booking_password
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "booking_user", "-pbooking_password"]
+      test: ["CMD-SHELL", "pg_isready -U booking_user -d booking_db"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -64,11 +63,11 @@ services:
       FLASK_APP: boot.py
       SECRET_KEY: test-secret
       JWT_SECRET_KEY: test-jwt-secret
-      MYSQL_HOST: db
-      MYSQL_PORT: 3306
-      MYSQL_USER: booking_user
-      MYSQL_PASSWORD: booking_password
-      MYSQL_DB: booking_db
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: booking_user
+      DB_PASSWORD: booking_password
+      DB_NAME: booking_db
       REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
@@ -79,5 +78,5 @@ services:
       - test
 
 volumes:
-  mysql_data:
+  postgres_data:
   redis_data:
