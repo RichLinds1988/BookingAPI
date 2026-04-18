@@ -1,102 +1,112 @@
+import os
+
+os.environ["TESTING"] = "true"
+
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import MagicMock, patch
-from app import create_app, db as _db
-from app.models import User, Resource, Booking
-from flask_jwt_extended import create_access_token
-from datetime import datetime, timedelta
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
+from app import cache
+from app.database import Base, get_db
+from app.models import Resource, User
+from app.utils.auth import create_access_token, create_refresh_token
 
-class TestConfig:
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    JWT_SECRET_KEY = "test-secret"
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
-    SECRET_KEY = "test-flask-secret"
-    REDIS_URL = "redis://localhost:6379/0"
-    CACHE_TTL = 30
-    RATELIMIT_ENABLED = False
-
-
-@pytest.fixture(scope="session")
-def app():
-    with patch("app.redis_lib.from_url") as mock_redis:
-        mock_redis.return_value = MagicMock()
-        application = create_app(TestConfig)
-    with patch("app.middleware.cache.redis_client") as mock_cache_redis:
-        mock_cache_redis.get.return_value = None
-        mock_cache_redis.setex.return_value = True
-        mock_cache_redis.keys.return_value = []
-        yield application
-
-
-@pytest.fixture(scope="function")
-def db(app):
-    with app.app_context():
-        _db.create_all()
-        yield _db
-        _db.session.remove()
-        _db.drop_all()
-
-
-@pytest.fixture(scope="function")
-def client(app, db):
-    with patch("app.middleware.cache.redis_client") as mock_cache_redis:
-        mock_cache_redis.get.return_value = None
-        mock_cache_redis.setex.return_value = True
-        mock_cache_redis.keys.return_value = []
-        yield app.test_client()
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.fixture
-def test_user(db, app):
-    with app.app_context():
-        user = User(name="Test User", email="test@example.com")
-        user.set_password("password123")
-        db.session.add(user)
-        db.session.commit()
-        db.session.refresh(user)
-        return user
+async def db():
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with session_factory() as session:
+        yield session
+        await session.rollback()
+
+    await engine.dispose()
 
 
 @pytest.fixture
-def auth_headers(app, test_user):
-    with app.app_context():
-        token = create_access_token(identity=str(test_user.id))
-        return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+async def client(db):
+    async def override_get_db():
+        yield db
+
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = None
+    mock_redis.setex.return_value = True
+    mock_redis.keys.return_value = []
+    mock_redis.delete.return_value = 1
+    mock_redis.ping.return_value = True
+    cache.redis_client = mock_redis
+
+    from app.main import app
+
+    app.dependency_overrides[get_db] = override_get_db
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def admin_user(db, app):
-    """A user with admin role for testing admin-only endpoints."""
-    with app.app_context():
-        user = User(name="Admin User", email="admin@example.com", role="admin")
-        user.set_password("password123")
-        db.session.add(user)
-        db.session.commit()
-        db.session.refresh(user)
-        return user
+async def test_user(db):
+    user = User(name="Test User", email="test@example.com")
+    user.set_password("password123")
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user
 
 
 @pytest.fixture
-def admin_headers(app, admin_user):
-    with app.app_context():
-        token = create_access_token(identity=str(admin_user.id))
-        return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+def auth_headers(test_user):
+    token = create_access_token(test_user.id)
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
-def test_resource(db, app):
-    with app.app_context():
-        resource = Resource(name="Boardroom A", description="Main boardroom", capacity=10)
-        db.session.add(resource)
-        db.session.commit()
-        db.session.refresh(resource)
-        return resource
+async def admin_user(db):
+    user = User(name="Admin User", email="admin@example.com", role="admin")
+    user.set_password("password123")
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_headers(admin_user):
+    token = create_access_token(admin_user.id)
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def refresh_headers(test_user):
+    token = create_refresh_token(test_user.id)
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def test_resource(db):
+    resource = Resource(name="Boardroom A", description="Main boardroom", capacity=10)
+    db.add(resource)
+    await db.flush()
+    await db.refresh(resource)
+    return resource
 
 
 @pytest.fixture
 def future_times():
+    from datetime import datetime, timedelta
+
     start = datetime.now() + timedelta(days=1)
     end = start + timedelta(hours=1)
     return start.strftime("%Y-%m-%dT%H:%M:%S"), end.strftime("%Y-%m-%dT%H:%M:%S")
