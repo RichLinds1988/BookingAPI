@@ -1,19 +1,19 @@
+import logging
 import os
 import sys
-import logging
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
 from alembic import context
 from dotenv import load_dotenv
+from sqlalchemy import engine_from_config, pool
 
 # ensure src/ is on the path so app.database and app.models can be imported
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 load_dotenv()
 
-from app.database import Base
 import app.models  # noqa: F401 — registers all models against Base.metadata
+from app.database import Base
 
 config = context.config
 
