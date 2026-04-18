@@ -1,20 +1,14 @@
 # Production overrides for docker-compose.yml
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 #
-# This file extends the base config with production-appropriate settings:
-# - Gunicorn instead of Flask's built-in dev server
-# - No exposed DB or Redis ports (reduces attack surface)
-# - Resource limits to prevent any single container starving the host
-# - Restart policies for resilience
+# Uses uvicorn with multiple workers instead of the single-worker dev server.
+# DB and Redis ports are not exposed — only the API container needs them.
 
 services:
   api:
-    # Gunicorn is a production-grade WSGI server
-    # Flask's built-in server is single-threaded and not suitable for production
-    # 4 workers = (2 x CPU cores) + 1 — standard Gunicorn recommendation
-    command: gunicorn --workers 4 --bind 0.0.0.0:5000 --timeout 60 "run:app"
-    environment:
-      FLASK_ENV: production
+    command: >
+      bash -c "alembic upgrade head &&
+               uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --app-dir src"
     restart: always
     deploy:
       resources:
@@ -23,8 +17,6 @@ services:
           memory: 512M
 
   db:
-    # Don't expose the DB port in production — only the API container needs it
-    # Exposing it publicly is a security risk
     ports: []
     restart: always
     deploy:
@@ -33,7 +25,6 @@ services:
           memory: 512M
 
   redis:
-    # Same — Redis should not be publicly accessible in production
     ports: []
     restart: always
     deploy:

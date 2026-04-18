@@ -1,39 +1,31 @@
+import logging
 import time
-from flask import request, g, current_app
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+logger = logging.getLogger("app.requests")
+
+_SKIP_PATHS = {"/openapi.json", "/redoc"}
 
 
-def register_request_logging(app):
-    """
-    Register before/after request hooks that log every HTTP request as structured JSON.
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000, 2)
 
-    Logs include method, path, status code, response time, and user ID (if authenticated).
-    This gives you a complete audit trail of all API activity without adding logging
-    calls to every individual route.
-    """
+        if not request.url.path.startswith("/docs") and request.url.path not in _SKIP_PATHS:
+            logger.info(
+                f"{request.method} {request.url.path} {response.status_code}",
+                extra={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "duration_ms": duration_ms,
+                    "ip": request.client.host if request.client else None,
+                },
+            )
 
-    @app.before_request
-    def start_timer():
-        # Store the start time on Flask's request context (g)
-        # g is a per-request global that lives for the duration of one request
-        g.start_time = time.perf_counter()
-
-    @app.after_request
-    def log_request(response):
-        # Calculate how long the request took in milliseconds
-        duration_ms = round((time.perf_counter() - g.start_time) * 1000, 2)
-
-        # Skip logging for Swagger UI asset requests to reduce noise
-        if request.path.startswith("/flasgger_static") or request.path == "/apidocs":
-            return response
-
-        current_app.logger.info(
-            f"{request.method} {request.path} {response.status_code}",
-            extra={
-                "method": request.method,
-                "path": request.path,
-                "status_code": response.status_code,
-                "duration_ms": duration_ms,
-                "ip": request.remote_addr,
-            }
-        )
         return response

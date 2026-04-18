@@ -7,7 +7,10 @@ install: ## Install all dependencies
 	pip install -r requirements.txt -r requirements-dev.txt
 
 run: ## Start the API server
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --app-dir src
+	cd src && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+migrate: ## Run database migrations
+	alembic -c migrations/alembic.ini upgrade head
 
 test: ## Run the test suite
 	pytest

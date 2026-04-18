@@ -2,14 +2,13 @@ FROM python:3.12-slim
 
 WORKDIR /project
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends make && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 COPY . .
 
-# FLASK_APP points to boot.py at root which adds src/ to the path itself
-ENV FLASK_APP=boot.py
+EXPOSE 8000
 
-EXPOSE 5000
-
-CMD ["bash", "-c", "flask db upgrade && python run.py"]
+CMD ["bash", "-c", "alembic -c migrations/alembic.ini upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir src"]

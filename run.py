@@ -1,12 +1,9 @@
-import sys
 import os
+import sys
 
-# Add src/ to path so 'app' and 'config' can be imported
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from app import create_app
-
-app = create_app()
+import uvicorn
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True, app_dir="src")

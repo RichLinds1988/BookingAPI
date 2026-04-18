@@ -1,0 +1,72 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
+from contextlib import asynccontextmanager
+
+import redis.asyncio as aioredis
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+
+from app import cache
+from app.database import init_db
+from app.limiter import limiter
+from app.middleware.request_logger import RequestLoggingMiddleware
+from app.utils.logging import configure_logging
+from config import Config
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    configure_logging()
+    # Skip real connections in test mode — tests supply their own DB session and mock Redis
+    if not os.getenv("TESTING"):
+        init_db(Config.DATABASE_URL)
+        cache.redis_client = aioredis.from_url(Config.REDIS_URL, decode_responses=True)
+    yield
+    if cache.redis_client:
+        await cache.redis_client.aclose()
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Booking API",
+        description="A RESTful booking API with JWT auth, Redis caching, and rate limiting.",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+
+    app.state.limiter = limiter
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={"error": "Too many requests", "retry_after": str(exc.detail)},
+        )
+
+    app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    from app.routes.auth import router as auth_router
+    from app.routes.bookings import router as bookings_router
+    from app.routes.health import router as health_router
+    from app.routes.resources import router as resources_router
+
+    app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
+    app.include_router(bookings_router, prefix="/api/bookings", tags=["Bookings"])
+    app.include_router(resources_router, prefix="/api/resources", tags=["Resources"])
+    app.include_router(health_router, tags=["Health"])
+
+    return app
+
+
+app = create_app()

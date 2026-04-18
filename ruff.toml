@@ -1,0 +1,12 @@
+exclude = [".claude"]
+
+line-length = 100
+
+[lint]
+select = ["E", "F", "I"]
+
+[lint.per-file-ignores]
+"migrations/env.py" = ["E402"]
+# Old Flask routes and tests are being replaced — long lines in docstrings/strings are temporary
+"src/app/routes/*.py" = ["E501"]
+"tests/*.py" = ["E501"]
