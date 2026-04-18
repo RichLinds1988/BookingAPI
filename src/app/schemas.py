@@ -11,18 +11,18 @@ class RegisterRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def name_not_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
+    def name_not_empty(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
             raise ValueError("name cannot be empty")
-        return v
+        return value
 
     @field_validator("password")
     @classmethod
-    def password_min_length(cls, v: str) -> str:
-        if len(v) < 8:
+    def password_min_length(cls, value: str) -> str:
+        if len(value) < 8:
             raise ValueError("password must be at least 8 characters")
-        return v
+        return value
 
 
 class LoginRequest(BaseModel):
@@ -35,10 +35,10 @@ class UpdateRoleRequest(BaseModel):
 
     @field_validator("role")
     @classmethod
-    def valid_role(cls, v: str) -> str:
-        if v not in ("user", "admin"):
+    def valid_role(cls, value: str) -> str:
+        if value not in ("user", "admin"):
             raise ValueError("role must be 'user' or 'admin'")
-        return v
+        return value
 
 
 class CreateBookingRequest(BaseModel):
@@ -50,10 +50,10 @@ class CreateBookingRequest(BaseModel):
 
     @field_validator("guests")
     @classmethod
-    def guests_positive(cls, v: int) -> int:
-        if v < 1:
+    def guests_positive(cls, value: int) -> int:
+        if value < 1:
             raise ValueError("guests must be at least 1")
-        return v
+        return value
 
     @model_validator(mode="after")
     def validate_times(self) -> "CreateBookingRequest":
@@ -71,11 +71,11 @@ class CreateResourceRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def name_not_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
+    def name_not_empty(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
             raise ValueError("name cannot be empty")
-        return v
+        return value
 
 
 class UpdateResourceRequest(BaseModel):
@@ -111,3 +111,24 @@ class BookingResponse(BaseModel):
     guests: int
     status: str
     created_at: str
+
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    password: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, value: str) -> str:
+        if value is not None:
+            value = value.strip()
+            if not value:
+                raise ValueError("name cannot be empty")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, value: str) -> str:
+        if value is not None and len(value) < 8:
+            raise ValueError("password must be at least 8 characters")
+        return value

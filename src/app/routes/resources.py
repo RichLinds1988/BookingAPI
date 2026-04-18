@@ -21,7 +21,7 @@ async def list_resources(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Resource).filter_by(is_active=True).order_by(Resource.name)
@@ -34,7 +34,7 @@ async def list_resources(
 async def get_resource(
     resource_id: int,
     request: Request,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Resource).filter_by(id=resource_id))
@@ -47,9 +47,8 @@ async def get_resource(
 @router.post("", status_code=201)
 @limiter.limit("30/hour")
 async def create_resource(
-    request: Request,
     body: CreateResourceRequest,
-    current_user=Depends(require_admin),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     resource = Resource(name=body.name, description=body.description, capacity=body.capacity)
@@ -65,9 +64,8 @@ async def create_resource(
 @limiter.limit("30/hour")
 async def update_resource(
     resource_id: int,
-    request: Request,
     body: UpdateResourceRequest,
-    current_user=Depends(require_admin),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Resource).filter_by(id=resource_id))

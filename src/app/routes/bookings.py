@@ -12,6 +12,8 @@ from app.schemas import BookingResponse, CreateBookingRequest
 from app.utils.auth import get_current_user
 from app.utils.pagination import paginate
 
+from src.app.models import User
+
 router = APIRouter()
 
 
@@ -42,7 +44,7 @@ async def list_bookings(
     request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Booking).filter_by(user_id=current_user.id).order_by(Booking.start_time)
@@ -57,7 +59,7 @@ async def check_availability(
     request: Request,
     start_time: str = Query(...),
     end_time: str = Query(...),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Resource).filter_by(id=resource_id))
@@ -83,8 +85,7 @@ async def check_availability(
 @limiter.limit("60/minute")
 async def get_booking(
     booking_id: int,
-    request: Request,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Booking).filter_by(id=booking_id, user_id=current_user.id))
@@ -97,9 +98,8 @@ async def get_booking(
 @router.post("", status_code=201)
 @limiter.limit("30/hour")
 async def create_booking(
-    request: Request,
     body: CreateBookingRequest,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Resource).filter_by(id=body.resource_id))
@@ -140,8 +140,7 @@ async def create_booking(
 @limiter.limit("30/hour")
 async def cancel_booking(
     booking_id: int,
-    request: Request,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Booking).filter_by(id=booking_id, user_id=current_user.id))

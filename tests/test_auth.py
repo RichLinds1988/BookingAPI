@@ -1,5 +1,3 @@
-
-
 class TestRegister:
     async def test_register_success(self, client):
         res = await client.post(
@@ -143,3 +141,46 @@ class TestRefresh:
     async def test_refresh_fails_without_token(self, client):
         res = await client.post("/api/auth/refresh")
         assert res.status_code == 401
+
+    async def test_update_profile_name(self, client, auth_headers, test_user, db):
+        res = await client.patch(
+            "/api/auth/me",
+            headers=auth_headers,
+            json={"name": "Updated Name"},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["user"]["name"] == "Updated Name"
+        assert data["user"]["email"] == "test@example.com"
+
+        # Verify in DB
+        await db.refresh(test_user)
+        assert test_user.name == "Updated Name"
+
+    async def test_update_profile_password(self, client, auth_headers, test_user):
+        res = await client.patch(
+            "/api/auth/me",
+            headers=auth_headers,
+            json={"password": "newpassword123"},
+        )
+        assert res.status_code == 200
+        assert res.json()["user"]["name"] == "Test User"
+
+        # Verify password changed
+        assert test_user.check_password("newpassword123")
+
+    async def test_update_profile_invalid_name(self, client, auth_headers):
+        res = await client.patch(
+            "/api/auth/me",
+            headers=auth_headers,
+            json={"name": ""},
+        )
+        assert res.status_code == 422
+
+    async def test_update_profile_short_password(self, client, auth_headers):
+        res = await client.patch(
+            "/api/auth/me",
+            headers=auth_headers,
+            json={"password": "short"},
+        )
+        assert res.status_code == 422

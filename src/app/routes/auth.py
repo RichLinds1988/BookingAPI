@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.limiter import limiter
 from app.models import User
-from app.schemas import LoginRequest, RegisterRequest, UpdateRoleRequest, UserResponse
+from app.schemas import LoginRequest, RegisterRequest, UpdateProfileRequest, UpdateRoleRequest, UserResponse
 from app.utils.auth import (
     create_access_token,
     create_refresh_token,
@@ -19,7 +19,6 @@ router = APIRouter()
 @router.post("/register", status_code=201)
 @limiter.limit("10/hour")
 async def register(
-    request: Request,
     body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -44,7 +43,6 @@ async def register(
 @router.post("/login")
 @limiter.limit("20/hour")
 async def login(
-    request: Request,
     body: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -65,7 +63,7 @@ async def login(
 
 @router.post("/refresh")
 @limiter.limit("60/hour")
-async def refresh(request: Request, current_user: User = Depends(get_refresh_user)):
+async def refresh(current_user: User = Depends(get_refresh_user)):
     return {"access_token": create_access_token(current_user.id)}
 
 
@@ -73,7 +71,6 @@ async def refresh(request: Request, current_user: User = Depends(get_refresh_use
 @limiter.limit("10/hour")
 async def update_user_role(
     user_id: int,
-    request: Request,
     body: UpdateRoleRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -92,3 +89,19 @@ async def update_user_role(
     target.role = body.role
     action = "promoted to admin" if body.role == "admin" else "demoted to user"
     return {"message": f"{target.name} {action}", "user": UserResponse(**target.to_dict())}
+
+
+@router.patch("/me")
+@limiter.limit("10/hour")
+async def update_profile(
+    body: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if body.name is not None:
+        current_user.name = body.name
+    if body.password is not None:
+        current_user.set_password(body.password)
+    await db.flush()
+    await db.refresh(current_user)
+    return {"user": UserResponse(**current_user.to_dict())}

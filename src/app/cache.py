@@ -9,14 +9,14 @@ redis_client: aioredis.Redis | None = None
 
 
 def cache_response(ttl: int = 300, key_prefix: str = "cache"):
-    def decorator(f: Callable):
-        @wraps(f)
+    def decorator(func: Callable):
+        @wraps(func)
         async def wrapper(*args, **kwargs):
             # FastAPI injects all route params by name — request will always be in kwargs
             request: Request | None = kwargs.get("request")
 
             if redis_client is None or request is None:
-                return await f(*args, **kwargs)
+                return await func(*args, **kwargs)
 
             cache_key = f"{key_prefix}:{request.url.path}?{request.url.query}"
             # Include user ID in key if authenticated to prevent data leakage
@@ -27,7 +27,7 @@ def cache_response(ttl: int = 300, key_prefix: str = "cache"):
             if cached:
                 return json.loads(cached)
 
-            result = await f(*args, **kwargs)
+            result = await func(*args, **kwargs)
 
             if isinstance(result, dict):
                 await redis_client.setex(cache_key, ttl, json.dumps(result, default=str))
