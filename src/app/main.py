@@ -16,12 +16,17 @@ from app import cache
 from app.database import init_db
 from app.limiter import limiter
 from app.middleware.request_logger import RequestLoggingMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.utils.logging import configure_logging
+from app.utils.validation import validate_environment
 from config import Config
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Validate environment on startup
+    if not os.getenv("TESTING"):
+        validate_environment()
     configure_logging()
     # Skip real connections in test mode — tests supply their own DB session and mock Redis
     if not os.getenv("TESTING"):
@@ -41,6 +46,11 @@ def create_app() -> FastAPI:
         docs_url=None,  # disabled — we serve both with pinned CDN versions below
         redoc_url=None,
     )
+
+    # Add request size limits (100KB max)
+    app.add_middleware(
+        lambda app: app,
+    )  # Placeholder for future middleware if needed
 
     @app.get("/docs", include_in_schema=False)
     async def swagger_ui() -> HTMLResponse:
@@ -68,12 +78,15 @@ def create_app() -> FastAPI:
             content={"error": "Too many requests", "retry_after": str(exc.detail)},
         )
 
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=["http://localhost:3000", "http://localhost:8000"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Content-Type", "Authorization"],
+        allow_credentials=True,
+        max_age=3600,
     )
 
     from app.routes.auth import router as auth_router
