@@ -16,7 +16,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
 
-        if not request.url.path.startswith("/docs") and request.url.path not in _SKIP_PATHS:
+        if (
+            request.method != "OPTIONS"
+            and not request.url.path.startswith("/docs")
+            and request.url.path not in _SKIP_PATHS
+        ):
             logger.info(
                 f"{request.method} {request.url.path} {response.status_code}",
                 extra={

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
@@ -48,6 +48,13 @@ class CreateBookingRequest(BaseModel):
     guests: int = 1
     notes: Optional[str] = None
 
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def normalize_to_utc(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
     @field_validator("guests")
     @classmethod
     def guests_positive(cls, value: int) -> int:
@@ -59,7 +66,7 @@ class CreateBookingRequest(BaseModel):
     def validate_times(self) -> "CreateBookingRequest":
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be after start_time")
-        if self.start_time < datetime.now():
+        if self.start_time < datetime.now(UTC):
             raise ValueError("start_time cannot be in the past")
         return self
 
