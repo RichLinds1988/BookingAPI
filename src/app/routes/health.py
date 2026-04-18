@@ -1,61 +1,33 @@
-from flask import Blueprint, jsonify
-from app import db, redis_client
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-health_bp = Blueprint("health", __name__)
+from app import cache
+from app.database import get_db
+
+router = APIRouter()
 
 
-@health_bp.get("/health")
-def health_check():
-    """
-    Health check endpoint.
-    ---
-    tags:
-      - Health
-    responses:
-      200:
-        description: All dependencies healthy
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                status:
-                  type: string
-                  example: ok
-                dependencies:
-                  type: object
-                  properties:
-                    database:
-                      type: string
-                      example: ok
-                    redis:
-                      type: string
-                      example: ok
-      503:
-        description: One or more dependencies are down
-    """
-    status = {
-        "status": "ok",
-        "dependencies": {
-            "database": "ok",
-            "redis": "ok",
-        }
-    }
+@router.get("/health")
+async def health_check(db: AsyncSession = Depends(get_db)):
+    status = {"status": "ok", "dependencies": {"database": "ok", "redis": "ok"}}
     http_status = 200
 
     try:
-        db.session.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
     except Exception as e:
-        status["dependencies"]["database"] = f"error: {str(e)}"
+        status["dependencies"]["database"] = f"error: {e}"
         status["status"] = "degraded"
         http_status = 503
 
     try:
-        redis_client.ping()
+        await cache.redis_client.ping()
     except Exception as e:
-        status["dependencies"]["redis"] = f"error: {str(e)}"
+        status["dependencies"]["redis"] = f"error: {e}"
         status["status"] = "degraded"
         http_status = 503
 
-    return jsonify(status), http_status
+    if http_status != 200:
+        return JSONResponse(status_code=503, content=status)
+    return status
