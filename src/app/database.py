@@ -15,9 +15,7 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] | None = None
 def init_db(database_url: str) -> None:
     global engine, AsyncSessionLocal
     engine = create_async_engine(database_url, echo=False)
-    AsyncSessionLocal = async_sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
+    AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

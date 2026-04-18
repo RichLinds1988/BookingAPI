@@ -33,7 +33,9 @@ def cache_response(ttl: int = 300, key_prefix: str = "cache"):
                 await redis_client.setex(cache_key, ttl, json.dumps(result, default=str))
 
             return result
+
         return wrapper
+
     return decorator
 
 

@@ -38,7 +38,7 @@ def create_app() -> FastAPI:
         description="A RESTful booking API with JWT auth, Redis caching, and rate limiting.",
         version="1.0.0",
         lifespan=lifespan,
-        docs_url=None,    # disabled — we serve both with pinned CDN versions below
+        docs_url=None,  # disabled — we serve both with pinned CDN versions below
         redoc_url=None,
     )
 

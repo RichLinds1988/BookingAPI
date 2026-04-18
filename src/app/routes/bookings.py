@@ -68,7 +68,9 @@ async def check_availability(
         start = datetime.fromisoformat(start_time)
         end = datetime.fromisoformat(end_time)
     except ValueError as err:
-        raise HTTPException(status_code=422, detail="Invalid datetime format, use YYYY-MM-DDTHH:MM:SS") from err
+        raise HTTPException(
+            status_code=422, detail="Invalid datetime format, use YYYY-MM-DDTHH:MM:SS"
+        ) from err
 
     available = not await _has_conflict(db, resource_id, start, end)
     return {

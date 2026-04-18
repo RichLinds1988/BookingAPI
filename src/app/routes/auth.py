@@ -5,7 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.limiter import limiter
 from app.models import User
-from app.schemas import LoginRequest, RegisterRequest, UpdateProfileRequest, UpdateRoleRequest, UserResponse
+from app.schemas import (
+    LoginRequest,
+    RegisterRequest,
+    UpdateProfileRequest,
+    UpdateRoleRequest,
+    UserResponse,
+)
 from app.utils.auth import (
     create_access_token,
     create_refresh_token,

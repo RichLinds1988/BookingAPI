@@ -25,14 +25,12 @@ class User(Base):
     )
 
     def set_password(self, password: str) -> None:
-        self.password_hash = bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt()
-        ).decode("utf-8")
+        self.password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode(
+            "utf-8"
+        )
 
     def check_password(self, password: str) -> bool:
-        return bcrypt.checkpw(
-            password.encode("utf-8"), self.password_hash.encode("utf-8")
-        )
+        return bcrypt.checkpw(password.encode("utf-8"), self.password_hash.encode("utf-8"))
 
     def to_dict(self) -> dict:
         return {"id": self.id, "email": self.email, "name": self.name, "role": self.role}
@@ -77,9 +75,7 @@ class Booking(Base):
     )
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
-    __table_args__ = (
-        Index("ix_bookings_resource_time", "resource_id", "start_time", "end_time"),
-    )
+    __table_args__ = (Index("ix_bookings_resource_time", "resource_id", "start_time", "end_time"),)
 
     user: Mapped["User"] = relationship("User", back_populates="bookings")
     resource: Mapped["Resource"] = relationship("Resource", back_populates="bookings")
