@@ -14,7 +14,38 @@ from app.utils.pagination import paginate
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", responses={
+    200: {
+        "description": "List of active resources",
+        "content": {
+            "application/json": {
+                "example": {
+                    "items": [
+                        {
+                            "id": 1,
+                            "name": "Conference Room A",
+                            "description": "Large conference room with video conferencing",
+                            "capacity": 20,
+                            "is_active": True
+                        }
+                    ],
+                    "total": 1,
+                    "page": 1,
+                    "per_page": 20,
+                    "pages": 1
+                }
+            }
+        }
+    },
+    401: {
+        "description": "Not authenticated",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Not authenticated"}
+            }
+        }
+    }
+})
 @limiter.limit("60/minute")
 @cache.cache_response(ttl=60, key_prefix="resources")
 async def list_resources(
@@ -28,7 +59,30 @@ async def list_resources(
     return await paginate(stmt, db, page=page, per_page=per_page)
 
 
-@router.get("/{resource_id}")
+@router.get("/{resource_id}", responses={
+    200: {
+        "description": "Resource details",
+        "content": {
+            "application/json": {
+                "example": {
+                    "id": 1,
+                    "name": "Conference Room A",
+                    "description": "Large conference room with video conferencing",
+                    "capacity": 20,
+                    "is_active": True
+                }
+            }
+        }
+    },
+    404: {
+        "description": "Resource not found",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Resource not found"}
+            }
+        }
+    }
+})
 @limiter.limit("60/minute")
 @cache.cache_response(ttl=60, key_prefix="resources")
 async def get_resource(
@@ -44,7 +98,30 @@ async def get_resource(
     return ResourceResponse(**resource.to_dict())
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, responses={
+    201: {
+        "description": "Resource created successfully",
+        "content": {
+            "application/json": {
+                "example": {
+                    "id": 1,
+                    "name": "Conference Room A",
+                    "description": "Large conference room with video conferencing",
+                    "capacity": 20,
+                    "is_active": True
+                }
+            }
+        }
+    },
+    403: {
+        "description": "Admin access required",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Admin access required"}
+            }
+        }
+    }
+})
 @limiter.limit("30/hour")
 async def create_resource(
     request: Request,
@@ -61,7 +138,38 @@ async def create_resource(
     return ResourceResponse(**resource.to_dict())
 
 
-@router.patch("/{resource_id}")
+@router.patch("/{resource_id}", responses={
+    200: {
+        "description": "Resource updated successfully",
+        "content": {
+            "application/json": {
+                "example": {
+                    "id": 1,
+                    "name": "Conference Room A (Updated)",
+                    "description": "Large conference room with video conferencing",
+                    "capacity": 25,
+                    "is_active": True
+                }
+            }
+        }
+    },
+    403: {
+        "description": "Admin access required",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Admin access required"}
+            }
+        }
+    },
+    404: {
+        "description": "Resource not found",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Resource not found"}
+            }
+        }
+    }
+})
 @limiter.limit("30/hour")
 async def update_resource(
     resource_id: int,

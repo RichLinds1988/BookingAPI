@@ -49,7 +49,74 @@ async def list_bookings(
     return await paginate(stmt, db, page=page, per_page=per_page)
 
 
-@router.get("/availability/{resource_id}")
+@router.get("", responses={
+    200: {
+        "description": "List of user's bookings",
+        "content": {
+            "application/json": {
+                "example": {
+                    "items": [
+                        {
+                            "id": 1,
+                            "user_id": 1,
+                            "resource_id": 1,
+                            "resource_name": "Conference Room A",
+                            "start_time": "2023-10-01T10:00:00",
+                            "end_time": "2023-10-01T11:00:00",
+                            "notes": "Team meeting",
+                            "guests": 5,
+                            "status": "confirmed",
+                            "created_at": "2023-09-30T15:00:00"
+                        }
+                    ],
+                    "total": 1,
+                    "page": 1,
+                    "per_page": 20,
+                    "pages": 1
+                }
+            }
+        }
+    },
+    401: {
+        "description": "Not authenticated",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Not authenticated"}
+            }
+        }
+    }
+})
+@router.get("/availability/{resource_id}", responses={
+    200: {
+        "description": "Availability check result",
+        "content": {
+            "application/json": {
+                "example": {
+                    "resource_id": 1,
+                    "available": True,
+                    "start_time": "2023-10-01T10:00:00",
+                    "end_time": "2023-10-01T11:00:00"
+                }
+            }
+        }
+    },
+    404: {
+        "description": "Resource not found",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Resource not found"}
+            }
+        }
+    },
+    422: {
+        "description": "Invalid datetime format",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Invalid datetime format, use YYYY-MM-DDTHH:MM:SS"}
+            }
+        }
+    }
+})
 @limiter.limit("60/minute")
 @cache.cache_response(ttl=30, key_prefix="availability")
 async def check_availability(
@@ -81,7 +148,35 @@ async def check_availability(
     }
 
 
-@router.get("/{booking_id}")
+@router.get("/{booking_id}", responses={
+    200: {
+        "description": "Booking details",
+        "content": {
+            "application/json": {
+                "example": {
+                    "id": 1,
+                    "user_id": 1,
+                    "resource_id": 1,
+                    "resource_name": "Conference Room A",
+                    "start_time": "2023-10-01T10:00:00",
+                    "end_time": "2023-10-01T11:00:00",
+                    "notes": "Team meeting",
+                    "guests": 5,
+                    "status": "confirmed",
+                    "created_at": "2023-09-30T15:00:00"
+                }
+            }
+        }
+    },
+    404: {
+        "description": "Booking not found",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Booking not found"}
+            }
+        }
+    }
+})
 @limiter.limit("60/minute")
 async def get_booking(
     booking_id: int,
@@ -173,7 +268,43 @@ async def create_booking(
     return BookingResponse(**booking.to_dict())
 
 
-@router.delete("/{booking_id}")
+@router.delete("/{booking_id}", responses={
+    200: {
+        "description": "Booking cancelled successfully",
+        "content": {
+            "application/json": {
+                "example": {
+                    "id": 1,
+                    "user_id": 1,
+                    "resource_id": 1,
+                    "resource_name": "Conference Room A",
+                    "start_time": "2023-10-01T10:00:00",
+                    "end_time": "2023-10-01T11:00:00",
+                    "notes": "Team meeting",
+                    "guests": 5,
+                    "status": "cancelled",
+                    "created_at": "2023-09-30T15:00:00"
+                }
+            }
+        }
+    },
+    404: {
+        "description": "Booking not found",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Booking not found"}
+            }
+        }
+    },
+    409: {
+        "description": "Booking already cancelled",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Booking is already cancelled"}
+            }
+        }
+    }
+})
 @limiter.limit("30/hour")
 async def cancel_booking(
     booking_id: int,

@@ -11,7 +11,36 @@ from app.database import get_db
 router = APIRouter()
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    responses={
+        200: {
+            "description": "All dependencies healthy",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "ok",
+                        "dependencies": {"database": "ok", "redis": "ok"},
+                    }
+                }
+            },
+        },
+        503: {
+            "description": "One or more dependencies unhealthy",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "degraded",
+                        "dependencies": {
+                            "database": "error: connection failed",
+                            "redis": "ok",
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
 async def health_check(db: AsyncSession = Depends(get_db)):
     status: dict[str, Any] = {"status": "ok", "dependencies": {"database": "ok", "redis": "ok"}}
     http_status = 200
