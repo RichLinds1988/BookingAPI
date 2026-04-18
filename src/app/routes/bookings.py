@@ -96,8 +96,43 @@ async def get_booking(
     return BookingResponse(**booking.to_dict())
 
 
-@router.post("", status_code=201)
-@limiter.limit("30/hour")
+@router.post("", status_code=201, responses={
+    201: {
+        "description": "Booking created successfully",
+        "content": {
+            "application/json": {
+                "example": {
+                    "id": 1,
+                    "user_id": 1,
+                    "resource_id": 1,
+                    "resource_name": "Conference Room A",
+                    "start_time": "2023-10-01T10:00:00",
+                    "end_time": "2023-10-01T11:00:00",
+                    "notes": "Team meeting",
+                    "guests": 5,
+                    "status": "confirmed",
+                    "created_at": "2023-09-30T15:00:00"
+                }
+            }
+        }
+    },
+    409: {
+        "description": "Resource already booked or unavailable",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Resource already booked for that time slot"}
+            }
+        }
+    },
+    422: {
+        "description": "Validation error",
+        "content": {
+            "application/json": {
+                "example": {"detail": [{"loc": ["body", "guests"], "msg": "guests must be at least 1", "type": "value_error"}]}
+            }
+        }
+    }
+})
 async def create_booking(
     request: Request,
     body: CreateBookingRequest,
