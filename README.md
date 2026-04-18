@@ -1,27 +1,25 @@
 # Booking API
 
-A production-ready RESTful booking API built with Flask, PostgreSQL, and Redis. Features JWT authentication with refresh tokens, Redis caching, rate limiting, database migrations, structured JSON logging, request tracing, role-based access control, and OpenAPI documentation.
+A production-ready RESTful booking API built with FastAPI, PostgreSQL, and Redis. Features JWT authentication with refresh tokens, Redis caching, rate limiting, database migrations, structured JSON logging, request tracing, role-based access control, and interactive OpenAPI documentation.
 
 Pairs with the [BookingUI](https://github.com/RichLinds1988/BookingUI) frontend built in React + TypeScript.
 
 ![CI](https://github.com/RichLinds1988/BookingAPI/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.12-blue)
-![Flask](https://img.shields.io/badge/flask-3.0-green)
+![FastAPI](https://img.shields.io/badge/fastapi-0.115-green)
 ![PostgreSQL](https://img.shields.io/badge/postgres-16-blue)
 
 ## Stack
 
-- **Flask** — API framework
+- **FastAPI** — async API framework with built-in OpenAPI docs
 - **PostgreSQL 16** — persistent storage
 - **Redis 7** — response caching + rate limiter storage
-- **Flask-JWT-Extended** — JWT authentication with refresh tokens
-- **Flask-Limiter** — per-route rate limiting
-- **Flask-Migrate** — database schema migrations
-- **Flask-CORS** — cross-origin request handling
-- **Flasgger** — OpenAPI/Swagger documentation
-- **Gunicorn** — production WSGI server
-- **SQLAlchemy** — ORM
+- **SQLAlchemy 2.0** — async ORM with `mapped_column` style models
+- **Alembic** — database schema migrations
+- **PyJWT** — JWT authentication with access + refresh tokens
+- **slowapi** — per-route rate limiting
+- **uvicorn** — ASGI server (dev + prod)
 - **Docker Compose** — local orchestration
 
 ## Getting Started
@@ -38,7 +36,7 @@ cd BookingAPI
 docker compose up --build
 ```
 
-The API will be available at `http://localhost:5000`.
+The API will be available at `http://localhost:8000`.
 
 ### Run (production)
 
@@ -46,9 +44,9 @@ The API will be available at `http://localhost:5000`.
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
 ```
 
-Production mode uses Gunicorn with 4 workers, removes exposed DB/Redis ports, and sets resource limits.
+Production mode uses uvicorn with 4 workers, removes exposed DB/Redis ports, and sets resource limits.
 
-> PostgreSQL and Redis are started first via healthchecks — the API container waits until both are ready before accepting traffic. Migrations run automatically on startup.
+> PostgreSQL and Redis are started first via healthchecks — the API container waits until both are ready before accepting traffic. Migrations run automatically on startup via Alembic.
 
 ### Environment Variables
 
@@ -60,10 +58,9 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |---|---|---|
-| `SECRET_KEY` | `dev-secret-change-me` | Flask secret key |
-| `JWT_SECRET_KEY` | `dev-jwt-secret-change-me` | JWT signing key |
+| `JWT_SECRET_KEY` | `dev-jwt-secret-change-me` | JWT signing key (use a long random string in prod) |
 | `JWT_ACCESS_TOKEN_EXPIRES` | `3600` | Access token TTL in seconds |
-| `JWT_REFRESH_TOKEN_EXPIRES_DAYS` | `7` | Refresh token TTL in days |
+| `JWT_REFRESH_TOKEN_EXPIRES` | `604800` | Refresh token TTL in seconds (7 days) |
 | `DB_HOST` | `db` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_USER` | `booking_user` | PostgreSQL user |
@@ -75,7 +72,9 @@ cp .env.example .env
 
 ## API Documentation
 
-Interactive Swagger UI is available at **http://localhost:5000/apidocs** when the app is running.
+Interactive Swagger UI is available at **http://localhost:8000/docs** when the app is running.
+
+ReDoc is also available at **http://localhost:8000/redoc**.
 
 Click **Authorize** and enter `Bearer <your_token>` to test protected endpoints directly from the browser.
 
@@ -113,7 +112,7 @@ Returns `503` if any dependency is down.
 | `POST` | `/api/auth/register` | Register a new user |
 | `POST` | `/api/auth/login` | Login and get tokens |
 | `POST` | `/api/auth/refresh` | Get a new access token using a refresh token |
-| `PATCH` | `/api/auth/users/:id/promote` | Promote a user to admin (admin only) |
+| `PATCH` | `/api/auth/users/:id/role` | Update a user's role (admin only) |
 
 Both `register` and `login` return an access token (1 hour) and a refresh token (7 days):
 
@@ -182,7 +181,7 @@ List endpoints support `?page=1&per_page=20` query params and return:
 }
 ```
 
-Validated against the resource's `capacity` — returns `422` if guests exceed capacity.
+Validated against the resource's `capacity` — returns `422` if guests exceed capacity. Back-to-back bookings are allowed (half-open interval `[start, end)`).
 
 ---
 
@@ -193,7 +192,7 @@ Validated against the resource's `capacity` — returns `422` if guests exceed c
 | `user` (default) | ✅ | ❌ |
 | `admin` | ✅ | ✅ |
 
-To promote a user to admin, use `PATCH /api/auth/users/:id/promote` (requires an existing admin token). The first admin must be set directly in the database:
+To promote a user to admin, use `PATCH /api/auth/users/:id/role` with `{"role": "admin"}` (requires an existing admin token). The first admin must be set directly in the database:
 
 ```bash
 docker compose exec db psql -U booking_user -d booking_db -c \
@@ -212,7 +211,7 @@ docker compose exec db psql -U booking_user -d booking_db -c \
 | `POST /api/bookings` | 30 / hour |
 | `GET` routes | 60 / minute |
 
-Limits are stored in Redis and shared across all API instances.
+Limits are stored in Redis and shared across all API instances. Exceeding a limit returns `429` with a `retry_after` field.
 
 ---
 
@@ -221,13 +220,15 @@ Limits are stored in Redis and shared across all API instances.
 ```
 BookingAPI/
 ├── src/
-│   ├── config.py
+│   ├── config.py                     # Environment-based config
 │   └── app/
-│       ├── __init__.py               # App factory, extensions
+│       ├── main.py                   # FastAPI app factory + lifespan
+│       ├── cache.py                  # Redis cache decorator + invalidation
+│       ├── limiter.py                # slowapi rate limiter instance
+│       ├── database.py               # Async SQLAlchemy engine + session
 │       ├── models.py                 # SQLAlchemy models (User, Resource, Booking)
+│       ├── schemas.py                # Pydantic v2 request schemas
 │       ├── middleware/
-│       │   ├── cache.py              # Redis cache decorator + invalidation helper
-│       │   ├── request_id.py         # Unique request ID middleware
 │       │   └── request_logger.py     # Structured JSON request logging
 │       ├── routes/
 │       │   ├── auth.py               # /api/auth
@@ -235,13 +236,14 @@ BookingAPI/
 │       │   ├── resources.py          # /api/resources
 │       │   └── health.py             # /health
 │       └── utils/
-│           ├── decorators.py         # admin_required decorator
+│           ├── auth.py               # JWT encode/decode + FastAPI dependencies
+│           ├── dependencies.py       # require_admin dependency
 │           ├── logging.py            # JSON log formatter
-│           └── pagination.py         # Reusable pagination helper
-├── tests/                            # pytest unit + integration tests
-├── migrations/                       # Flask-Migrate migration files
-├── boot.py                           # Flask CLI entry point
-├── run.py                            # App entry point
+│           └── pagination.py        # Reusable async pagination helper
+├── tests/                            # pytest async test suite
+├── migrations/                       # Alembic migration files
+├── run.py                            # Local dev entry point
+├── Makefile                          # Common dev commands
 ├── Dockerfile
 ├── docker-compose.yml
 ├── docker-compose.prod.yml           # Production overrides
@@ -252,36 +254,33 @@ BookingAPI/
 
 ## Running Tests
 
+Tests use SQLite in-memory with `aiosqlite` and a mocked Redis client — no running PostgreSQL or Redis required.
+
 ```bash
-docker compose --profile test run test
+make test
 ```
 
-Tests use SQLite in-memory — no PostgreSQL or Redis required. 54 tests covering auth, bookings, resources, models, and health check.
+56 tests covering auth, bookings, resources, models, and health check.
 
-## Running CI Checks Locally
+## Local Development
 
-**Flake8:**
 ```bash
-docker compose run --rm api bash -c "pip install -r requirements-dev.txt && flake8 src/app/ --max-line-length=120 --ignore=E501,W503"
-```
-
-**Mypy:**
-```bash
-docker compose run --rm api bash -c "pip install -r requirements-dev.txt && mypy src/app/"
-```
-
-**Tests:**
-```bash
-docker compose --profile test run test
+make install    # install dependencies
+make run        # start uvicorn with hot reload on :8000
+make migrate    # run alembic migrations
+make test       # run pytest
+make lint       # ruff check
+make format     # ruff format
+make pre-push   # lint + format + tests
 ```
 
 ## CI
 
 GitHub Actions runs on every push to `main`:
 
-- **flake8** — style and error checking
+- **ruff** — style and import checking
 - **mypy** — static type checking
-- **pytest** — full test suite against PostgreSQL and Redis
+- **pytest** — full test suite
 
 ## Caching Strategy
 
