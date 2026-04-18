@@ -1,68 +1,58 @@
 from datetime import datetime, timezone
-from app import db
+from typing import List, Optional
+
 import bcrypt
+from sqlalchemy import Boolean, Enum, ForeignKey, Index, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
 
 
-class User(db.Model):
+class User(Base):
     __tablename__ = "users"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(
+        Enum("user", "admin", name="user_role"), default="user", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
-    # index=True adds a database index on email for faster lookups during login
-    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
-
-    # Never store plain text passwords — only the bcrypt hash
-    password_hash = db.Column(db.String(255), nullable=False)
-    name = db.Column(db.String(255), nullable=False)
-
-    # Role controls what the user can do — 'user' can book, 'admin' can manage resources
-    # Default is 'user' so all new registrations are non-privileged
-    role = db.Column(
-        db.Enum('user', 'admin', name='user_role'), default='user', nullable=False
+    bookings: Mapped[List["Booking"]] = relationship(
+        "Booking", back_populates="user", lazy="selectin"
     )
 
-    # lambda is used here so the datetime is evaluated at insert time, not at class definition time
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-
-    # Defines the one-to-many relationship to Booking
-    # backref="user" means you can access booking.user from a Booking instance
-    # lazy=True means bookings are only loaded from the DB when you actually access them
-    bookings = db.relationship("Booking", backref="user", lazy=True)
-
-    def set_password(self, password: str):
-        # bcrypt.gensalt() generates a random salt so the same password
-        # produces a different hash each time — prevents rainbow table attacks
-        # encode/decode converts between Python strings and bytes which bcrypt requires
+    def set_password(self, password: str) -> None:
         self.password_hash = bcrypt.hashpw(
             password.encode("utf-8"), bcrypt.gensalt()
         ).decode("utf-8")
 
     def check_password(self, password: str) -> bool:
-        # bcrypt handles the salt comparison internally — we just pass both values
         return bcrypt.checkpw(
             password.encode("utf-8"), self.password_hash.encode("utf-8")
         )
 
-    def to_dict(self):
-        # Only expose safe fields — never include password_hash in API responses
+    def to_dict(self) -> dict:
         return {"id": self.id, "email": self.email, "name": self.name, "role": self.role}
 
 
-class Resource(db.Model):
-    """A bookable resource — e.g. a room, desk, vehicle, or service slot."""
-
+class Resource(Base):
     __tablename__ = "resources"
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.Text)  # Text allows longer strings than String(255)
-    capacity = db.Column(db.Integer, default=1)
-    is_active = db.Column(db.Boolean, default=True)  # Soft delete — deactivate instead of deleting
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    capacity: Mapped[int] = mapped_column(default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
-    bookings = db.relationship("Booking", backref="resource", lazy=True)
+    bookings: Mapped[List["Booking"]] = relationship(
+        "Booking", back_populates="resource", lazy="selectin"
+    )
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
             "name": self.name,
@@ -72,43 +62,34 @@ class Resource(db.Model):
         }
 
 
-class Booking(db.Model):
+class Booking(Base):
     __tablename__ = "bookings"
 
-    id = db.Column(db.Integer, primary_key=True)
-
-    # ForeignKey links this column to the primary key of another table
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    resource_id = db.Column(db.Integer, db.ForeignKey("resources.id"), nullable=False)
-
-    start_time = db.Column(db.DateTime, nullable=False)
-    end_time = db.Column(db.DateTime, nullable=False)
-    notes = db.Column(db.Text)
-
-    # Number of guests for this booking — validated against the resource's capacity
-    guests = db.Column(db.Integer, default=1, nullable=False)
-
-    # Enum restricts the column to only these three values at the database level
-    status = db.Column(
-        db.Enum("confirmed", "cancelled", "pending", name="booking_status"), default="confirmed"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    resource_id: Mapped[int] = mapped_column(ForeignKey("resources.id"), nullable=False)
+    start_time: Mapped[datetime] = mapped_column(nullable=False)
+    end_time: Mapped[datetime] = mapped_column(nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    guests: Mapped[int] = mapped_column(default=1, nullable=False)
+    status: Mapped[str] = mapped_column(
+        Enum("confirmed", "cancelled", "pending", name="booking_status"), default="confirmed"
     )
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
-    # Composite index on resource_id + start_time + end_time
-    # This speeds up the conflict detection query which filters on all three columns
-    # __table_args__ must be a tuple, hence the trailing comma
     __table_args__ = (
-        db.Index("ix_bookings_resource_time", "resource_id", "start_time", "end_time"),
+        Index("ix_bookings_resource_time", "resource_id", "start_time", "end_time"),
     )
 
-    def to_dict(self):
+    user: Mapped["User"] = relationship("User", back_populates="bookings")
+    resource: Mapped["Resource"] = relationship("Resource", back_populates="bookings")
+
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
             "user_id": self.user_id,
             "resource_id": self.resource_id,
-            # Access the related resource's name via the backref defined in Resource
             "resource_name": self.resource.name if self.resource else None,
-            # isoformat() converts datetime to a standard string like "2026-04-01T09:00:00"
             "start_time": self.start_time.isoformat(),
             "end_time": self.end_time.isoformat(),
             "notes": self.notes,
