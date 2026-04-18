@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.models import Booking, Resource, User
 
@@ -33,7 +34,7 @@ class TestUserModel:
         db.add(u1)
         await db.flush()
         db.add(u2)
-        with pytest.raises(Exception):
+        with pytest.raises(IntegrityError):
             await db.flush()
 
 

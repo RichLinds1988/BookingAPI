@@ -35,10 +35,10 @@ def create_refresh_token(user_id: int) -> str:
 def _decode_token(token: str, expected_type: str) -> int:
     try:
         payload = jwt.decode(token, Config.JWT_SECRET_KEY, algorithms=[Config.JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.ExpiredSignatureError as err:
+        raise HTTPException(status_code=401, detail="Token has expired") from err
+    except jwt.InvalidTokenError as err:
+        raise HTTPException(status_code=401, detail="Invalid token") from err
 
     if payload.get("type") != expected_type:
         raise HTTPException(status_code=401, detail="Invalid token type")

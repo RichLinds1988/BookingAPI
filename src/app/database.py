@@ -21,7 +21,8 @@ def init_db(database_url: str) -> None:
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    assert AsyncSessionLocal is not None, "Database not initialized - call init_db() first"
+    if AsyncSessionLocal is None:
+        raise ValueError("Database not initialized - call init_db() first")
     async with AsyncSessionLocal() as session:
         try:
             yield session
