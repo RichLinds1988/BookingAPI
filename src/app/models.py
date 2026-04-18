@@ -2,10 +2,18 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 import bcrypt
-from sqlalchemy import Boolean, Enum, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+def _to_utc_isoformat(value: datetime) -> str:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+    return value.isoformat()
 
 
 class User(Base):
@@ -18,7 +26,9 @@ class User(Base):
     role: Mapped[str] = mapped_column(
         Enum("user", "admin", name="user_role"), default="user", nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     bookings: Mapped[List["Booking"]] = relationship(
         "Booking", back_populates="user", lazy="selectin"
@@ -44,7 +54,9 @@ class Resource(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     capacity: Mapped[int] = mapped_column(default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     bookings: Mapped[List["Booking"]] = relationship(
         "Booking", back_populates="resource", lazy="selectin"
@@ -66,14 +78,16 @@ class Booking(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     resource_id: Mapped[int] = mapped_column(ForeignKey("resources.id"), nullable=False)
-    start_time: Mapped[datetime] = mapped_column(nullable=False)
-    end_time: Mapped[datetime] = mapped_column(nullable=False)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text)
     guests: Mapped[int] = mapped_column(default=1, nullable=False)
     status: Mapped[str] = mapped_column(
         Enum("confirmed", "cancelled", "pending", name="booking_status"), default="confirmed"
     )
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     __table_args__ = (Index("ix_bookings_resource_time", "resource_id", "start_time", "end_time"),)
 
@@ -81,15 +95,16 @@ class Booking(Base):
     resource: Mapped["Resource"] = relationship("Resource", back_populates="bookings")
 
     def to_dict(self) -> dict:
+        resource = self.__dict__.get("resource")
         return {
             "id": self.id,
             "user_id": self.user_id,
             "resource_id": self.resource_id,
-            "resource_name": self.resource.name if self.resource else None,
-            "start_time": self.start_time.isoformat(),
-            "end_time": self.end_time.isoformat(),
+            "resource_name": resource.name if resource else None,
+            "start_time": _to_utc_isoformat(self.start_time),
+            "end_time": _to_utc_isoformat(self.end_time),
             "notes": self.notes,
             "guests": self.guests,
             "status": self.status,
-            "created_at": self.created_at.isoformat(),
+            "created_at": _to_utc_isoformat(self.created_at),
         }

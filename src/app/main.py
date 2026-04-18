@@ -80,9 +80,11 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
+
+    # Keep CORS as the outermost middleware so headers are present even on error responses.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://localhost:8000"],
+        allow_origins=["http://localhost:3000"],
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "Authorization"],
         allow_credentials=True,

@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app import cache
 from app.database import get_db
@@ -13,6 +14,12 @@ from app.utils.auth import get_current_user
 from app.utils.pagination import paginate
 
 router = APIRouter()
+
+
+def _normalize_to_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 async def _has_conflict(
@@ -45,47 +52,15 @@ async def list_bookings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Booking).filter_by(user_id=current_user.id).order_by(Booking.start_time)
+    stmt = (
+        select(Booking)
+        .options(selectinload(Booking.resource))
+        .filter_by(user_id=current_user.id)
+        .order_by(Booking.start_time)
+    )
     return await paginate(stmt, db, page=page, per_page=per_page)
 
 
-@router.get("", responses={
-    200: {
-        "description": "List of user's bookings",
-        "content": {
-            "application/json": {
-                "example": {
-                    "items": [
-                        {
-                            "id": 1,
-                            "user_id": 1,
-                            "resource_id": 1,
-                            "resource_name": "Conference Room A",
-                            "start_time": "2023-10-01T10:00:00",
-                            "end_time": "2023-10-01T11:00:00",
-                            "notes": "Team meeting",
-                            "guests": 5,
-                            "status": "confirmed",
-                            "created_at": "2023-09-30T15:00:00"
-                        }
-                    ],
-                    "total": 1,
-                    "page": 1,
-                    "per_page": 20,
-                    "pages": 1
-                }
-            }
-        }
-    },
-    401: {
-        "description": "Not authenticated",
-        "content": {
-            "application/json": {
-                "example": {"detail": "Not authenticated"}
-            }
-        }
-    }
-})
 @router.get("/availability/{resource_id}", responses={
     200: {
         "description": "Availability check result",
@@ -132,8 +107,8 @@ async def check_availability(
         raise HTTPException(status_code=404, detail="Resource not found")
 
     try:
-        start = datetime.fromisoformat(start_time)
-        end = datetime.fromisoformat(end_time)
+        start = _normalize_to_utc(datetime.fromisoformat(start_time))
+        end = _normalize_to_utc(datetime.fromisoformat(end_time))
     except ValueError as err:
         raise HTTPException(
             status_code=422, detail="Invalid datetime format, use YYYY-MM-DDTHH:MM:SS"
@@ -184,7 +159,11 @@ async def get_booking(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Booking).filter_by(id=booking_id, user_id=current_user.id))
+    result = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.resource))
+        .filter_by(id=booking_id, user_id=current_user.id)
+    )
     booking = result.scalar_one_or_none()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -312,7 +291,11 @@ async def cancel_booking(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Booking).filter_by(id=booking_id, user_id=current_user.id))
+    result = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.resource))
+        .filter_by(id=booking_id, user_id=current_user.id)
+    )
     booking = result.scalar_one_or_none()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")

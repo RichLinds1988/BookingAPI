@@ -23,14 +23,22 @@ def cache_response(ttl: int = 300, key_prefix: str = "cache"):
             current_user = kwargs.get("current_user")
             if current_user and hasattr(current_user, "id"):
                 cache_key += f":user_{current_user.id}"
-            cached = await redis_client.get(cache_key)
-            if cached:
-                return json.loads(cached)
+            try:
+                cached = await redis_client.get(cache_key)
+                if cached:
+                    return json.loads(cached)
+            except Exception:
+                # Fail open if Redis is unavailable so API endpoints still respond.
+                return await func(*args, **kwargs)
 
             result = await func(*args, **kwargs)
 
             if isinstance(result, dict):
-                await redis_client.setex(cache_key, ttl, json.dumps(result, default=str))
+                try:
+                    await redis_client.setex(cache_key, ttl, json.dumps(result, default=str))
+                except Exception:
+                    # Cache write failures should never fail the request path.
+                    pass
 
             return result
 

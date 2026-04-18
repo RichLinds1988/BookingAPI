@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from app.models import Booking, Resource, User
 from app.utils.auth import create_access_token
@@ -77,6 +77,15 @@ class TestCreateBooking:
         res = await make_booking(client, auth_headers, 9999, start, end)
         assert res.status_code == 404
 
+    async def test_create_with_timezone_aware_inputs(self, client, auth_headers, test_resource):
+        start = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+        end = (datetime.now(UTC) + timedelta(days=1, hours=1)).isoformat()
+        res = await make_booking(client, auth_headers, test_resource.id, start, end)
+        assert res.status_code == 201
+        data = res.json()
+        assert data["start_time"].endswith("+00:00")
+        assert data["end_time"].endswith("+00:00")
+
 
 class TestListBookings:
     async def test_list_own_bookings(self, client, auth_headers, test_resource, future_times):
@@ -86,6 +95,7 @@ class TestListBookings:
         assert res.status_code == 200
         data = res.json()
         assert len(data["items"]) == 1
+        assert data["items"][0]["resource_name"] == test_resource.name
         assert data["pagination"]["total"] == 1
 
     async def test_list_empty(self, client, auth_headers):
@@ -205,3 +215,50 @@ class TestAvailability:
             headers=auth_headers,
         )
         assert res.status_code == 404
+
+    async def test_available_with_timezone_aware_query_params(
+        self, client, auth_headers, test_resource
+    ):
+        start = datetime.now(UTC) + timedelta(days=1)
+        end = start + timedelta(hours=1)
+
+        res = await client.get(
+            f"/api/bookings/availability/{test_resource.id}",
+            headers=auth_headers,
+            params={"start_time": start.isoformat(), "end_time": end.isoformat()},
+        )
+
+        assert res.status_code == 200
+        data = res.json()
+        assert data["available"] is True
+        assert data["start_time"].endswith("+00:00")
+        assert data["end_time"].endswith("+00:00")
+
+    async def test_conflict_detected_with_different_timezone_offsets(
+        self, client, auth_headers, test_resource
+    ):
+        # Book in UTC.
+        start = datetime.now(UTC) + timedelta(days=2)
+        end = start + timedelta(hours=1)
+        create_res = await make_booking(
+            client,
+            auth_headers,
+            test_resource.id,
+            start.isoformat(),
+            end.isoformat(),
+        )
+        assert create_res.status_code == 201
+
+        # Query the same absolute interval in +02:00.
+        plus_two = timezone(timedelta(hours=2))
+        start_plus_2 = start.astimezone(plus_two)
+        end_plus_2 = end.astimezone(plus_two)
+
+        res = await client.get(
+            f"/api/bookings/availability/{test_resource.id}",
+            headers=auth_headers,
+            params={"start_time": start_plus_2.isoformat(), "end_time": end_plus_2.isoformat()},
+        )
+
+        assert res.status_code == 200
+        assert res.json()["available"] is False
