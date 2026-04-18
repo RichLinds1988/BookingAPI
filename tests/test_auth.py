@@ -77,6 +77,58 @@ class TestLogin:
         assert "refresh_token" in res.json()
 
 
+class TestUpdateRole:
+    async def test_promote_user_to_admin(self, client, admin_headers, test_user):
+        res = await client.patch(
+            f"/api/auth/users/{test_user.id}/role",
+            headers=admin_headers,
+            json={"role": "admin"},
+        )
+        assert res.status_code == 200
+        assert res.json()["user"]["role"] == "admin"
+
+    async def test_demote_user(self, client, admin_headers, db):
+        from app.models import User
+
+        other_admin = User(name="Other Admin", email="other@example.com", role="admin")
+        other_admin.set_password("password123")
+        db.add(other_admin)
+        await db.flush()
+        await db.refresh(other_admin)
+
+        res = await client.patch(
+            f"/api/auth/users/{other_admin.id}/role",
+            headers=admin_headers,
+            json={"role": "user"},
+        )
+        assert res.status_code == 200
+        assert res.json()["user"]["role"] == "user"
+
+    async def test_requires_admin(self, client, auth_headers, test_user):
+        res = await client.patch(
+            f"/api/auth/users/{test_user.id}/role",
+            headers=auth_headers,
+            json={"role": "admin"},
+        )
+        assert res.status_code == 403
+
+    async def test_cannot_demote_self(self, client, admin_headers, admin_user):
+        res = await client.patch(
+            f"/api/auth/users/{admin_user.id}/role",
+            headers=admin_headers,
+            json={"role": "user"},
+        )
+        assert res.status_code == 400
+
+    async def test_user_not_found(self, client, admin_headers):
+        res = await client.patch(
+            "/api/auth/users/9999/role",
+            headers=admin_headers,
+            json={"role": "admin"},
+        )
+        assert res.status_code == 404
+
+
 class TestRefresh:
     async def test_refresh_returns_new_access_token(self, client, refresh_headers):
         res = await client.post("/api/auth/refresh", headers=refresh_headers)
