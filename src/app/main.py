@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
         cache.redis_client = aioredis.from_url(Config.REDIS_URL, decode_responses=True)
     yield
     if cache.redis_client:
-        await cache.redis_client.aclose()
+        await cache.redis_client.aclose()  # type: ignore[attr-defined]
 
 
 def create_app() -> FastAPI:
