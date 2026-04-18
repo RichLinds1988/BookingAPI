@@ -8,7 +8,8 @@ from contextlib import asynccontextmanager
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from app import cache
@@ -37,7 +38,26 @@ def create_app() -> FastAPI:
         description="A RESTful booking API with JWT auth, Redis caching, and rate limiting.",
         version="1.0.0",
         lifespan=lifespan,
+        docs_url=None,    # disabled — we serve both with pinned CDN versions below
+        redoc_url=None,
     )
+
+    @app.get("/docs", include_in_schema=False)
+    async def swagger_ui() -> HTMLResponse:
+        return get_swagger_ui_html(
+            openapi_url="/openapi.json",
+            title="Booking API — Swagger UI",
+            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.4/swagger-ui-bundle.js",
+            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.4/swagger-ui.css",
+        )
+
+    @app.get("/redoc", include_in_schema=False)
+    async def redoc() -> HTMLResponse:
+        return get_redoc_html(
+            openapi_url="/openapi.json",
+            title="Booking API — ReDoc",
+            redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@2.4.0/bundles/redoc.standalone.js",
+        )
 
     app.state.limiter = limiter
 
