@@ -19,6 +19,10 @@ def cache_response(ttl: int = 300, key_prefix: str = "cache"):
                 return await f(*args, **kwargs)
 
             cache_key = f"{key_prefix}:{request.url.path}?{request.url.query}"
+            # Include user ID in key if authenticated to prevent data leakage
+            current_user = kwargs.get("current_user")
+            if current_user and hasattr(current_user, "id"):
+                cache_key += f":user_{current_user.id}"
             cached = await redis_client.get(cache_key)
             if cached:
                 return json.loads(cached)

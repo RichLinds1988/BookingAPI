@@ -3,7 +3,7 @@ exclude = [".claude"]
 line-length = 100
 
 [lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "S", "B", "C4", "UP"]
 
 [lint.per-file-ignores]
 "migrations/env.py" = ["E402"]

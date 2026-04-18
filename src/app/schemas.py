@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 
 class RegisterRequest(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     password: str
 
     @field_validator("name")
