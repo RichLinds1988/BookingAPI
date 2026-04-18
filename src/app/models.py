@@ -92,7 +92,9 @@ class Booking(Base):
     __table_args__ = (Index("ix_bookings_resource_time", "resource_id", "start_time", "end_time"),)
 
     user: Mapped["User"] = relationship("User", back_populates="bookings")
-    resource: Mapped["Resource"] = relationship("Resource", back_populates="bookings")
+    resource: Mapped["Resource"] = relationship(
+        "Resource", back_populates="bookings", lazy="selectin"
+    )
 
     def to_dict(self) -> dict:
         resource = self.__dict__.get("resource")

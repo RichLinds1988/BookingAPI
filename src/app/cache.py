@@ -1,11 +1,14 @@
 import json
+import logging
 from functools import wraps
 from typing import Callable
 
 import redis.asyncio as aioredis
 from fastapi import Request
+from redis.exceptions import RedisError
 
 redis_client: aioredis.Redis | None = None
+logger = logging.getLogger("app.cache")
 
 
 def cache_response(ttl: int = 300, key_prefix: str = "cache"):
@@ -27,7 +30,7 @@ def cache_response(ttl: int = 300, key_prefix: str = "cache"):
                 cached = await redis_client.get(cache_key)
                 if cached:
                     return json.loads(cached)
-            except Exception:
+            except RedisError:
                 # Fail open if Redis is unavailable so API endpoints still respond.
                 return await func(*args, **kwargs)
 
@@ -36,9 +39,9 @@ def cache_response(ttl: int = 300, key_prefix: str = "cache"):
             if isinstance(result, dict):
                 try:
                     await redis_client.setex(cache_key, ttl, json.dumps(result, default=str))
-                except Exception:
+                except RedisError:
                     # Cache write failures should never fail the request path.
-                    pass
+                    logger.warning("Failed to write response to cache", exc_info=True)
 
             return result
 
