@@ -21,8 +21,8 @@ jobs:
       - name: Install linting tools
         run: pip install -r requirements-dev.txt
 
-      - name: flake8 (style + errors)
-        run: flake8 src/app/ --max-line-length=120 --ignore=E501,W503
+      - name: ruff (style + errors)
+        run: ruff check .
 
       - name: mypy (type checking)
         run: mypy src/app/
@@ -72,7 +72,6 @@ jobs:
         run: pytest
         env:
           PYTHONPATH: src
-          FLASK_ENV: testing
           SECRET_KEY: ci-secret-key
           JWT_SECRET_KEY: ci-jwt-secret-key-long-enough
           DB_HOST: 127.0.0.1
