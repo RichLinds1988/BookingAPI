@@ -8,7 +8,7 @@ from app import cache
 from app.database import get_db
 from app.limiter import limiter
 from app.models import Booking, Resource
-from app.schemas import CreateBookingRequest
+from app.schemas import BookingResponse, CreateBookingRequest
 from app.utils.auth import get_current_user
 from app.utils.pagination import paginate
 
@@ -91,7 +91,7 @@ async def get_booking(
     booking = result.scalar_one_or_none()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    return booking.to_dict()
+    return BookingResponse(**booking.to_dict())
 
 
 @router.post("", status_code=201)
@@ -133,7 +133,7 @@ async def create_booking(
 
     await cache.invalidate_cache("bookings:*")
     await cache.invalidate_cache("availability:*")
-    return booking.to_dict()
+    return BookingResponse(**booking.to_dict())
 
 
 @router.delete("/{booking_id}")
@@ -156,4 +156,4 @@ async def cancel_booking(
 
     await cache.invalidate_cache("bookings:*")
     await cache.invalidate_cache("availability:*")
-    return booking.to_dict()
+    return BookingResponse(**booking.to_dict())

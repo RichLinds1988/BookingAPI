@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.limiter import limiter
 from app.models import User
-from app.schemas import LoginRequest, RegisterRequest, UpdateRoleRequest
+from app.schemas import LoginRequest, RegisterRequest, UpdateRoleRequest, UserResponse
 from app.utils.auth import (
     create_access_token,
     create_refresh_token,
@@ -35,7 +35,7 @@ async def register(
     await db.refresh(user)
 
     return {
-        "user": user.to_dict(),
+        "user": UserResponse(**user.to_dict()),
         "access_token": create_access_token(user.id),
         "refresh_token": create_refresh_token(user.id),
     }
@@ -57,7 +57,7 @@ async def login(
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     return {
-        "user": user.to_dict(),
+        "user": UserResponse(**user.to_dict()),
         "access_token": create_access_token(user.id),
         "refresh_token": create_refresh_token(user.id),
     }
@@ -91,4 +91,4 @@ async def update_user_role(
 
     target.role = body.role
     action = "promoted to admin" if body.role == "admin" else "demoted to user"
-    return {"message": f"{target.name} {action}", "user": target.to_dict()}
+    return {"message": f"{target.name} {action}", "user": UserResponse(**target.to_dict())}

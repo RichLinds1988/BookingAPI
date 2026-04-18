@@ -83,3 +83,31 @@ class UpdateResourceRequest(BaseModel):
     description: Optional[str] = None
     capacity: Optional[int] = None
     is_active: Optional[bool] = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    name: str
+    role: str
+
+
+class ResourceResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    capacity: int
+    is_active: bool
+
+
+class BookingResponse(BaseModel):
+    id: int
+    user_id: int
+    resource_id: int
+    resource_name: Optional[str]
+    start_time: str
+    end_time: str
+    notes: Optional[str]
+    guests: int
+    status: str
+    created_at: str

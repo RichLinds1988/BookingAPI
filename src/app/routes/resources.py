@@ -6,7 +6,7 @@ from app import cache
 from app.database import get_db
 from app.limiter import limiter
 from app.models import Resource
-from app.schemas import CreateResourceRequest, UpdateResourceRequest
+from app.schemas import CreateResourceRequest, ResourceResponse, UpdateResourceRequest
 from app.utils.auth import get_current_user
 from app.utils.dependencies import require_admin
 from app.utils.pagination import paginate
@@ -41,7 +41,7 @@ async def get_resource(
     resource = result.scalar_one_or_none()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
-    return resource.to_dict()
+    return ResourceResponse(**resource.to_dict())
 
 
 @router.post("", status_code=201)
@@ -58,7 +58,7 @@ async def create_resource(
     await db.refresh(resource)
 
     await cache.invalidate_cache("resources:*")
-    return resource.to_dict()
+    return ResourceResponse(**resource.to_dict())
 
 
 @router.patch("/{resource_id}")
@@ -85,4 +85,4 @@ async def update_resource(
         resource.is_active = body.is_active
 
     await cache.invalidate_cache("resources:*")
-    return resource.to_dict()
+    return ResourceResponse(**resource.to_dict())
