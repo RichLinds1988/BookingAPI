@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import cache
 from app.database import get_db
 from app.limiter import limiter
-from app.models import Resource
+from app.models import Resource, User
 from app.schemas import CreateResourceRequest, ResourceResponse, UpdateResourceRequest
 from app.utils.auth import get_current_user
 from app.utils.dependencies import require_admin
@@ -47,6 +47,7 @@ async def get_resource(
 @router.post("", status_code=201)
 @limiter.limit("30/hour")
 async def create_resource(
+    request: Request,
     body: CreateResourceRequest,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -64,6 +65,7 @@ async def create_resource(
 @limiter.limit("30/hour")
 async def update_resource(
     resource_id: int,
+    request: Request,
     body: UpdateResourceRequest,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),

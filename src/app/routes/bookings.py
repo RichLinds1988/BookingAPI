@@ -7,12 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import cache
 from app.database import get_db
 from app.limiter import limiter
-from app.models import Booking, Resource
+from app.models import Booking, Resource, User
 from app.schemas import BookingResponse, CreateBookingRequest
 from app.utils.auth import get_current_user
 from app.utils.pagination import paginate
-
-from src.app.models import User
 
 router = APIRouter()
 
@@ -85,6 +83,7 @@ async def check_availability(
 @limiter.limit("60/minute")
 async def get_booking(
     booking_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -98,6 +97,7 @@ async def get_booking(
 @router.post("", status_code=201)
 @limiter.limit("30/hour")
 async def create_booking(
+    request: Request,
     body: CreateBookingRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -140,6 +140,7 @@ async def create_booking(
 @limiter.limit("30/hour")
 async def cancel_booking(
     booking_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

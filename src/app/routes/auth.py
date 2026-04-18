@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ router = APIRouter()
 @router.post("/register", status_code=201)
 @limiter.limit("10/hour")
 async def register(
+    request: Request,
     body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -43,6 +44,7 @@ async def register(
 @router.post("/login")
 @limiter.limit("20/hour")
 async def login(
+    request: Request,
     body: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -63,7 +65,7 @@ async def login(
 
 @router.post("/refresh")
 @limiter.limit("60/hour")
-async def refresh(current_user: User = Depends(get_refresh_user)):
+async def refresh(request: Request, current_user: User = Depends(get_refresh_user)):
     return {"access_token": create_access_token(current_user.id)}
 
 
@@ -71,6 +73,7 @@ async def refresh(current_user: User = Depends(get_refresh_user)):
 @limiter.limit("10/hour")
 async def update_user_role(
     user_id: int,
+    request: Request,
     body: UpdateRoleRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -94,6 +97,7 @@ async def update_user_role(
 @router.patch("/me")
 @limiter.limit("10/hour")
 async def update_profile(
+    request: Request,
     body: UpdateProfileRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

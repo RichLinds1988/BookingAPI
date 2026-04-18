@@ -11,7 +11,7 @@ class TestUserModel:
     def test_password_hashing(self):
         user = User(name="Rich", email="rich@example.com")
         user.set_password("mypassword")
-        assert user.password_hash != "mypassword"
+        assert user.password_hash != "mypassword"  # noqa: S105
         assert user.check_password("mypassword") is True
         assert user.check_password("wrongpassword") is False
 
