@@ -9,5 +9,6 @@ select = ["E", "F", "I", "S", "B", "C4", "UP"]
 "migrations/env.py" = ["E402"]
 # Old Flask routes and tests are being replaced — long lines in docstrings/strings are temporary
 "src/app/routes/*.py" = ["E501", "B008"]
+"tests/conftest.py" = ["E402", "E501", "S101"]
 "tests/*.py" = ["E501", "S101"]
 "src/app/utils/*.py" = ["B008"]

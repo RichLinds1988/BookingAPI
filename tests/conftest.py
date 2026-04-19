@@ -1,8 +1,10 @@
 import os
 
 os.environ["TESTING"] = "true"
-# Guarantee a RFC 7518-compliant HMAC key length (>=32 bytes) in tests.
-os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-minimum-32-bytes-long!")
+# Force a RFC 7518-compliant HMAC key (>=32 bytes) in tests.
+# This overrides any short key set in CI or local environment variables.
+_TEST_JWT_KEY = "test-jwt-secret-key-minimum-32-bytes-long!"  # noqa: S105
+os.environ["JWT_SECRET_KEY"] = _TEST_JWT_KEY
 
 from unittest.mock import AsyncMock
 
