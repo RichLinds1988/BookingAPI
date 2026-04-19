@@ -35,6 +35,15 @@ class TestRegister:
         assert res.status_code == 201
         assert res.json()["user"]["email"] == "rich@example.com"
 
+    async def test_register_sets_auth_cookies(self, client):
+        res = await client.post(
+            "/api/auth/register",
+            json={"name": "Cookie User", "email": "cookie@example.com", "password": "password123"},
+        )
+        assert res.status_code == 201
+        assert res.cookies.get("access_token")
+        assert res.cookies.get("refresh_token")
+
 
 class TestLogin:
     async def test_login_success(self, client, test_user):
@@ -73,6 +82,26 @@ class TestLogin:
         )
         assert res.status_code == 200
         assert "refresh_token" in res.json()
+
+    async def test_login_sets_auth_cookies(self, client, test_user):
+        res = await client.post(
+            "/api/auth/login",
+            json={"email": "test@example.com", "password": "password123"},
+        )
+        assert res.status_code == 200
+        assert res.cookies.get("access_token")
+        assert res.cookies.get("refresh_token")
+
+    async def test_cookie_auth_allows_protected_route_without_header(self, client, test_user):
+        login_res = await client.post(
+            "/api/auth/login",
+            json={"email": "test@example.com", "password": "password123"},
+        )
+        assert login_res.status_code == 200
+
+        res = await client.patch("/api/auth/me", json={"name": "Cookie Auth Name"})
+        assert res.status_code == 200
+        assert res.json()["user"]["name"] == "Cookie Auth Name"
 
 
 class TestUpdateRole:
@@ -141,6 +170,31 @@ class TestRefresh:
     async def test_refresh_fails_without_token(self, client):
         res = await client.post("/api/auth/refresh")
         assert res.status_code == 401
+
+    async def test_refresh_works_with_cookie_only(self, client, test_user):
+        login_res = await client.post(
+            "/api/auth/login",
+            json={"email": "test@example.com", "password": "password123"},
+        )
+        assert login_res.status_code == 200
+
+        res = await client.post("/api/auth/refresh")
+        assert res.status_code == 200
+        assert res.cookies.get("access_token")
+
+    async def test_logout_clears_auth_cookies(self, client, test_user):
+        login_res = await client.post(
+            "/api/auth/login",
+            json={"email": "test@example.com", "password": "password123"},
+        )
+        assert login_res.status_code == 200
+
+        logout_res = await client.post("/api/auth/logout")
+        assert logout_res.status_code == 200
+        set_cookie_header = ",".join(logout_res.headers.get_list("set-cookie"))
+        assert "access_token=\"\"" in set_cookie_header
+        assert "refresh_token=\"\"" in set_cookie_header
+        assert "Max-Age=0" in set_cookie_header
 
     async def test_update_profile_name(self, client, auth_headers, test_user, db):
         res = await client.patch(

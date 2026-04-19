@@ -25,3 +25,8 @@ class Config:
     # Stored as plain ints (seconds) — PyJWT doesn't use timedelta
     JWT_ACCESS_TOKEN_EXPIRES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600))
     JWT_REFRESH_TOKEN_EXPIRES: int = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES_DAYS", 7)) * 86400
+
+    ACCESS_COOKIE_NAME = os.getenv("ACCESS_COOKIE_NAME", "access_token")
+    REFRESH_COOKIE_NAME = os.getenv("REFRESH_COOKIE_NAME", "refresh_token")
+    COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "lax")

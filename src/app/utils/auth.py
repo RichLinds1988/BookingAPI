@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,13 +46,26 @@ def _decode_token(token: str, expected_type: str) -> int:
     return int(payload["sub"])
 
 
+def _extract_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+    cookie_name: str,
+) -> str:
+    cookie_token = request.cookies.get(cookie_name)
+    if cookie_token:
+        return cookie_token
+    if credentials:
+        return credentials.credentials
+    raise HTTPException(status_code=401, detail="Not authenticated")
+
+
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    user_id = _decode_token(credentials.credentials, "access")
+    token = _extract_token(request, credentials, Config.ACCESS_COOKIE_NAME)
+    user_id = _decode_token(token, "access")
     result = await db.execute(select(User).filter_by(id=user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -61,12 +74,12 @@ async def get_current_user(
 
 
 async def get_refresh_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    user_id = _decode_token(credentials.credentials, "refresh")
+    token = _extract_token(request, credentials, Config.REFRESH_COOKIE_NAME)
+    user_id = _decode_token(token, "refresh")
     result = await db.execute(select(User).filter_by(id=user_id))
     user = result.scalar_one_or_none()
     if not user:

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,8 +19,44 @@ from app.utils.auth import (
     get_current_user,
     get_refresh_user,
 )
+from config import Config
 
 router = APIRouter()
+
+
+def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str) -> None:
+    response.set_cookie(
+        key=Config.ACCESS_COOKIE_NAME,
+        value=access_token,
+        httponly=True,
+        secure=Config.COOKIE_SECURE,
+        samesite=Config.COOKIE_SAMESITE,
+        max_age=Config.JWT_ACCESS_TOKEN_EXPIRES,
+    )
+    response.set_cookie(
+        key=Config.REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=Config.COOKIE_SECURE,
+        samesite=Config.COOKIE_SAMESITE,
+        max_age=Config.JWT_REFRESH_TOKEN_EXPIRES,
+    )
+
+
+def _set_access_cookie(response: JSONResponse, access_token: str) -> None:
+    response.set_cookie(
+        key=Config.ACCESS_COOKIE_NAME,
+        value=access_token,
+        httponly=True,
+        secure=Config.COOKIE_SECURE,
+        samesite=Config.COOKIE_SAMESITE,
+        max_age=Config.JWT_ACCESS_TOKEN_EXPIRES,
+    )
+
+
+def _clear_auth_cookies(response: JSONResponse) -> None:
+    response.delete_cookie(Config.ACCESS_COOKIE_NAME, samesite=Config.COOKIE_SAMESITE)
+    response.delete_cookie(Config.REFRESH_COOKIE_NAME, samesite=Config.COOKIE_SAMESITE)
 
 
 @router.post(
@@ -82,11 +119,20 @@ async def register(
     await db.flush()
     await db.refresh(user)
 
-    return {
-        "user": UserResponse(**user.to_dict()),
-        "access_token": create_access_token(user.id),
-        "refresh_token": create_refresh_token(user.id),
-    }
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+    response = JSONResponse(
+        status_code=201,
+        content={
+            "user": UserResponse(**user.to_dict()).model_dump(),
+            "success": True,
+            # Transitional response fields for existing frontend clients.
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+        },
+    )
+    _set_auth_cookies(response, access_token, refresh_token)
+    return response
 
 
 @router.post(
@@ -129,11 +175,19 @@ async def login(
     if not user or not user.check_password(body.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    return {
-        "user": UserResponse(**user.to_dict()),
-        "access_token": create_access_token(user.id),
-        "refresh_token": create_refresh_token(user.id),
-    }
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+    response = JSONResponse(
+        content={
+            "user": UserResponse(**user.to_dict()).model_dump(),
+            "success": True,
+            # Transitional response fields for existing frontend clients.
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+        }
+    )
+    _set_auth_cookies(response, access_token, refresh_token)
+    return response
 
 
 @router.post(
@@ -157,7 +211,24 @@ async def login(
 )
 @limiter.limit("60/hour")
 async def refresh(request: Request, current_user: User = Depends(get_refresh_user)):
-    return {"access_token": create_access_token(current_user.id)}
+    access_token = create_access_token(current_user.id)
+    response = JSONResponse(
+        content={
+            "success": True,
+            # Transitional response field for existing frontend clients.
+            "access_token": access_token,
+        }
+    )
+    _set_access_cookie(response, access_token)
+    return response
+
+
+@router.post("/logout")
+@limiter.limit("60/hour")
+async def logout(request: Request) -> JSONResponse:
+    response = JSONResponse(content={"success": True})
+    _clear_auth_cookies(response)
+    return response
 
 
 @router.patch(
