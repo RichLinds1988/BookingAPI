@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 import bcrypt
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -54,6 +54,8 @@ class Resource(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     capacity: Mapped[int] = mapped_column(default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    image_url: Mapped[Optional[str]] = mapped_column(Text)
+    tags: Mapped[Optional[list]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -69,6 +71,8 @@ class Resource(Base):
             "description": self.description,
             "capacity": self.capacity,
             "is_active": self.is_active,
+            "image_url": self.image_url,
+            "tags": self.tags or [],
         }
 
 
@@ -103,6 +107,7 @@ class Booking(Base):
             "user_id": self.user_id,
             "resource_id": self.resource_id,
             "resource_name": resource.name if resource else None,
+            "resource_image_url": resource.image_url if resource else None,
             "start_time": _to_utc_isoformat(self.start_time),
             "end_time": _to_utc_isoformat(self.end_time),
             "notes": self.notes,

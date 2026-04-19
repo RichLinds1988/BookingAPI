@@ -95,10 +95,12 @@ def create_app() -> FastAPI:
     from app.routes.bookings import router as bookings_router
     from app.routes.health import router as health_router
     from app.routes.resources import router as resources_router
+    from app.routes.uploads import router as uploads_router
 
     app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
     app.include_router(bookings_router, prefix="/api/bookings", tags=["Bookings"])
     app.include_router(resources_router, prefix="/api/resources", tags=["Resources"])
+    app.include_router(uploads_router, prefix="/api/resources", tags=["Uploads"])
     app.include_router(health_router, tags=["Health"])
 
     return app

@@ -11,6 +11,9 @@ def validate_environment() -> None:
         "DB_NAME",
         "REDIS_URL",
         "JWT_SECRET_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "S3_BUCKET_NAME",
     ]
 
     missing = [var for var in required_vars if not os.getenv(var)]

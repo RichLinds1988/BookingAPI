@@ -10,3 +10,4 @@ slowapi==0.1.9
 redis==7.4.0
 python-dotenv==1.2.2
 email-validator==2.1.1
+boto3==1.38.0

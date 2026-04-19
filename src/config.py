@@ -26,6 +26,12 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", 3600))
     JWT_REFRESH_TOKEN_EXPIRES: int = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES_DAYS", 7)) * 86400
 
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    AWS_REGION = os.getenv("AWS_REGION", "ca-central-1")
+    S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "")
+    S3_PRESIGNED_URL_EXPIRY = 3600
+
     ACCESS_COOKIE_NAME = os.getenv("ACCESS_COOKIE_NAME", "access_token")
     REFRESH_COOKIE_NAME = os.getenv("REFRESH_COOKIE_NAME", "refresh_token")
     COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"

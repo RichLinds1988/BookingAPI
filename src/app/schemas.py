@@ -75,6 +75,8 @@ class CreateResourceRequest(BaseModel):
     name: str
     description: Optional[str] = None
     capacity: int = 1
+    image_url: Optional[str] = None
+    tags: Optional[list[str]] = None
 
     @field_validator("name")
     @classmethod
@@ -90,6 +92,8 @@ class UpdateResourceRequest(BaseModel):
     description: Optional[str] = None
     capacity: Optional[int] = None
     is_active: Optional[bool] = None
+    image_url: Optional[str] = None
+    tags: Optional[list[str]] = None
 
 
 class UserResponse(BaseModel):
@@ -105,6 +109,9 @@ class ResourceResponse(BaseModel):
     description: Optional[str]
     capacity: int
     is_active: bool
+    image_url: Optional[str] = None
+    tags: list[str] = []
+    active_booking_count: int = 0
 
 
 class BookingResponse(BaseModel):
@@ -112,12 +119,33 @@ class BookingResponse(BaseModel):
     user_id: int
     resource_id: int
     resource_name: Optional[str]
+    resource_image_url: Optional[str] = None
     start_time: str
     end_time: str
     notes: Optional[str]
     guests: int
     status: str
     created_at: str
+
+
+class PresignedUrlRequest(BaseModel):
+    filename: str
+    content_type: str
+
+    @field_validator("content_type")
+    @classmethod
+    def valid_image_type(cls, value: str) -> str:
+        allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+        if value not in allowed:
+            raise ValueError(f"content_type must be one of: {', '.join(sorted(allowed))}")
+        return value
+
+
+class PresignedUrlResponse(BaseModel):
+    upload_url: str
+    object_url: str
+    key: str
+    expires_in: int
 
 
 class UpdateProfileRequest(BaseModel):
