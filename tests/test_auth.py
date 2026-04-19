@@ -192,8 +192,8 @@ class TestRefresh:
         logout_res = await client.post("/api/auth/logout")
         assert logout_res.status_code == 200
         set_cookie_header = ",".join(logout_res.headers.get_list("set-cookie"))
-        assert "access_token=\"\"" in set_cookie_header
-        assert "refresh_token=\"\"" in set_cookie_header
+        assert 'access_token=""' in set_cookie_header
+        assert 'refresh_token=""' in set_cookie_header
         assert "Max-Age=0" in set_cookie_header
 
     async def test_update_profile_name(self, client, auth_headers, test_user, db):

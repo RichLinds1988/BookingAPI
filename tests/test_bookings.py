@@ -159,7 +159,9 @@ class TestCancelBooking:
         assert res.status_code == 200
         assert res.json()["status"] == "cancelled"
 
-    async def test_cancel_already_cancelled(self, client, auth_headers, test_resource, future_times):
+    async def test_cancel_already_cancelled(
+        self, client, auth_headers, test_resource, future_times
+    ):
         start, end = future_times
         booking = (await make_booking(client, auth_headers, test_resource.id, start, end)).json()
         await client.delete(f"/api/bookings/{booking['id']}", headers=auth_headers)
