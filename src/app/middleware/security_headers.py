@@ -17,7 +17,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "img-src 'self' data: https://fastapi.tiangolo.com;"
+                "img-src 'self' data: https://fastapi.tiangolo.com; "
+                "connect-src 'self' https://cdn.jsdelivr.net;"
             )
         else:
             response.headers["Content-Security-Policy"] = "default-src 'self'"
