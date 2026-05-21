@@ -12,7 +12,9 @@ class Config:
     _db_url = os.getenv("DATABASE_URL")
     if _db_url:
         # Railway provides postgresql:// — swap scheme for asyncpg driver
-        DATABASE_URL = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1).replace("postgres://", "postgresql+asyncpg://", 1)
+        DATABASE_URL = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1).replace(
+            "postgres://", "postgresql+asyncpg://", 1
+        )
     else:
         DATABASE_URL = (
             f"postgresql+asyncpg://{os.getenv('DB_USER', 'booking_user')}:"

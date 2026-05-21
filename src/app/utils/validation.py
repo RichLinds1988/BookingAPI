@@ -3,12 +3,14 @@ import os
 
 def validate_environment() -> None:
     """Validate required environment variables at startup."""
+    # DATABASE_URL (provided by Railway) satisfies all individual DB_* vars
+    has_database_url = bool(os.getenv("DATABASE_URL"))
+    db_vars = (
+        [] if has_database_url else ["DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT", "DB_NAME"]
+    )
+
     required_vars = [
-        "DB_USER",
-        "DB_PASSWORD",
-        "DB_HOST",
-        "DB_PORT",
-        "DB_NAME",
+        *db_vars,
         "REDIS_URL",
         "JWT_SECRET_KEY",
         "AWS_ACCESS_KEY_ID",

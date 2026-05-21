@@ -27,16 +27,22 @@ target_metadata = Base.metadata
 # Prefer DATABASE_URL if set (Railway injects this automatically for linked Postgres services),
 # otherwise fall back to individual DB_* vars for local dev
 _db_url = os.getenv("DATABASE_URL")
-if _db_url:
-    SYNC_DATABASE_URL = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1).replace("postgres://", "postgresql+psycopg2://", 1)
-else:
-    SYNC_DATABASE_URL = (
-        f"postgresql+psycopg2://{os.getenv('DB_USER', 'booking_user')}:"
-        f"{os.getenv('DB_PASSWORD', '')}@"
-        f"{os.getenv('DB_HOST', 'localhost')}:"
-        f"{os.getenv('DB_PORT', '5432')}/"
-        f"{os.getenv('DB_NAME', 'booking_db')}"
+if not _db_url:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set. "
+        "In Railway, link the Postgres service and set DATABASE_URL=${{Postgres.DATABASE_URL}} "
+        "(replace 'Postgres' with the exact name of your Postgres service in Railway)."
     )
+# Alembic needs psycopg2 driver — swap scheme if needed
+SYNC_DATABASE_URL = (
+    _db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    .replace("postgresql://", "postgresql+psycopg2://", 1)
+    .replace("postgres://", "postgresql+psycopg2://", 1)
+)
+print(
+    f"[booking-api] Connecting to DB host: {SYNC_DATABASE_URL.split('@')[-1].split('/')[0]}",
+    flush=True,
+)
 config.set_main_option("sqlalchemy.url", SYNC_DATABASE_URL)
 
 
