@@ -7,13 +7,20 @@ load_dotenv()
 
 class Config:
     # asyncpg driver for async SQLAlchemy — psycopg2 stays in requirements for alembic migrations
-    DATABASE_URL = (
-        f"postgresql+asyncpg://{os.getenv('DB_USER', 'booking_user')}:"
-        f"{os.getenv('DB_PASSWORD', '')}@"
-        f"{os.getenv('DB_HOST', 'localhost')}:"
-        f"{os.getenv('DB_PORT', '5432')}/"
-        f"{os.getenv('DB_NAME', 'booking_db')}"
-    )
+    # Prefer DATABASE_URL if set (Railway injects this automatically for linked Postgres services),
+    # otherwise fall back to individual DB_* vars for local dev
+    _db_url = os.getenv("DATABASE_URL")
+    if _db_url:
+        # Railway provides postgresql:// — swap scheme for asyncpg driver
+        DATABASE_URL = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1).replace("postgres://", "postgresql+asyncpg://", 1)
+    else:
+        DATABASE_URL = (
+            f"postgresql+asyncpg://{os.getenv('DB_USER', 'booking_user')}:"
+            f"{os.getenv('DB_PASSWORD', '')}@"
+            f"{os.getenv('DB_HOST', 'localhost')}:"
+            f"{os.getenv('DB_PORT', '5432')}/"
+            f"{os.getenv('DB_NAME', 'booking_db')}"
+        )
 
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     CACHE_TTL = 300

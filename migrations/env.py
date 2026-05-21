@@ -24,13 +24,19 @@ logger = logging.getLogger("alembic.env")
 target_metadata = Base.metadata
 
 # Alembic runs synchronously — use psycopg2 here even though the app uses asyncpg
-SYNC_DATABASE_URL = (
-    f"postgresql+psycopg2://{os.getenv('DB_USER', 'booking_user')}:"
-    f"{os.getenv('DB_PASSWORD', '')}@"
-    f"{os.getenv('DB_HOST', 'localhost')}:"
-    f"{os.getenv('DB_PORT', '5432')}/"
-    f"{os.getenv('DB_NAME', 'booking_db')}"
-)
+# Prefer DATABASE_URL if set (Railway injects this automatically for linked Postgres services),
+# otherwise fall back to individual DB_* vars for local dev
+_db_url = os.getenv("DATABASE_URL")
+if _db_url:
+    SYNC_DATABASE_URL = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1).replace("postgres://", "postgresql+psycopg2://", 1)
+else:
+    SYNC_DATABASE_URL = (
+        f"postgresql+psycopg2://{os.getenv('DB_USER', 'booking_user')}:"
+        f"{os.getenv('DB_PASSWORD', '')}@"
+        f"{os.getenv('DB_HOST', 'localhost')}:"
+        f"{os.getenv('DB_PORT', '5432')}/"
+        f"{os.getenv('DB_NAME', 'booking_db')}"
+    )
 config.set_main_option("sqlalchemy.url", SYNC_DATABASE_URL)
 
 
